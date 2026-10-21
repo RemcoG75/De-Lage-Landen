@@ -1,0 +1,1707 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-title" content="Lage Landen">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#2f2920">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>De Lage Landen</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grandstander:wght@600;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: full-screen map canvas; HUD floats on top, choice cards along the bottom. One deliberate world: peat, clay and North Sea grey. */
+:root{
+  --peat:#2f2920; --peat2:#3d3528; --paper:#f2e4c1; --ink:#2a241b; --clay:#a8693b; --clay2:#6b4424;
+  --sea:#3f6f87; --gold:#e8b44a; --moss:#5d7a3f;
+  --display:'Grandstander','Trebuchet MS',system-ui,sans-serif;
+  --body:'Atkinson Hyperlegible',system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--peat);color:var(--paper);font-family:var(--body);overflow:hidden;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#app{position:relative;height:100%;box-sizing:border-box;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+#stage{position:relative;width:100%;height:100%}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hud{position:absolute;top:8px;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none}
+.res{display:flex;gap:8px;flex-wrap:wrap}
+.pill{background:rgba(29,25,18,.88);border:2px solid #6b5a3e;border-radius:999px;padding:4px 16px 4px 10px;font:800 28px/1.1 var(--display);display:flex;align-items:center;gap:8px;color:var(--paper)}
+.pill svg{width:30px;height:30px}
+.storm{gap:10px}
+.bar{width:90px;height:14px;border-radius:7px;background:#5a6670;overflow:hidden}
+.bar i{display:block;height:100%;background:#cfd8de;border-radius:7px;transition:width .3s}
+#era{text-align:center;font-family:var(--display);text-shadow:0 2px 0 rgba(0,0,0,.5);min-width:0}
+#era .t{font-size:20px;font-weight:800}
+#era .y{font:400 14px var(--body);opacity:.85}
+.btns{display:flex;gap:8px}
+.btns button{pointer-events:auto;width:50px;height:50px;border-radius:50%;border:2px solid #6b5a3e;background:rgba(29,25,18,.88);color:var(--paper);font:800 22px var(--display);cursor:pointer}
+button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+#note .more{float:right;font-size:14px;opacity:.7}
+#note{cursor:pointer}
+#note{position:absolute;top:74px;left:0;max-width:min(300px,55%);background:var(--paper);color:var(--ink);border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.4;box-shadow:0 4px 0 var(--clay2);pointer-events:auto}
+#note h4{margin:0 0 4px;font:800 13px var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--clay2)}
+#note p{margin:0 0 8px}
+#note p:last-child{margin:0}
+#note .q{font-weight:700}
+#sub{position:absolute;left:50%;transform:translateX(-50%);bottom:122px;max-width:min(560px,90%);text-align:center;font:600 15px/1.35 var(--body);background:rgba(29,25,18,.8);padding:6px 12px;border-radius:10px;opacity:0;transition:opacity .4s;pointer-events:none;z-index:7}
+#sub.on{opacity:1}
+#sub.top{bottom:auto;top:10px}
+#cards{position:absolute;bottom:12px;left:0;right:0;display:flex;justify-content:center;gap:12px;flex-wrap:wrap;pointer-events:none}
+.card{pointer-events:auto;display:flex;align-items:center;gap:10px;min-height:84px;padding:8px 18px 8px 12px;border-radius:20px;background:var(--paper);color:var(--ink);border:3px solid var(--clay);box-shadow:0 5px 0 var(--clay2);font:800 22px var(--display);cursor:pointer;animation:pop .35s ease-out}
+.card:active{transform:translateY(3px);box-shadow:0 2px 0 var(--clay2)}
+.card .ic{font-size:44px;line-height:1}
+.card .cost{display:flex;align-items:center;gap:3px;font:700 17px var(--body);color:var(--clay2)}
+.card .cost svg{width:20px;height:20px}
+.card.poor{opacity:.55}
+.card .lbl{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+@keyframes pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+#ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,17,12,.72);z-index:8}
+.box{background:var(--paper);color:var(--ink);border-radius:22px;padding:22px 26px;max-width:min(520px,92%);box-shadow:0 8px 0 var(--clay2);text-align:center}
+.box h1{font:800 44px/1.05 var(--display);margin:0 0 6px;color:var(--clay2);text-wrap:balance}
+.box h2{font:800 28px/1.1 var(--display);margin:0 0 4px;text-wrap:balance}
+.box .yr{font:700 15px var(--body);color:var(--moss);margin:0 0 12px;letter-spacing:.04em;text-transform:uppercase}
+.box p{font-size:16px;line-height:1.45;margin:0 0 12px;text-align:left}
+.box .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.lng{display:inline-flex;margin:0 0 14px;border:2px solid var(--clay2);border-radius:999px;overflow:hidden}
+.lng button{font:800 17px var(--display);padding:8px 16px;border:0;background:transparent;color:var(--clay2);cursor:pointer}
+.lng button[aria-pressed="true"]{background:var(--clay2);color:var(--paper)}
+.big{font:800 26px var(--display);padding:14px 30px;border-radius:18px;border:3px solid var(--clay2);background:var(--gold);color:var(--ink);box-shadow:0 5px 0 var(--clay2);cursor:pointer}
+.big.alt{background:transparent;font-size:20px;padding:12px 22px}
+.big:active{transform:translateY(3px);box-shadow:0 2px 0 var(--clay2)}
+.box .lng{margin-bottom:4px}
+.box .vh{font:800 14px var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--clay2);margin:14px 0 6px;text-align:left}
+.vc{display:flex;flex-wrap:wrap;gap:6px}
+.vc button{font:700 15px var(--body);padding:8px 12px;border-radius:999px;border:2px solid var(--clay);background:transparent;color:var(--ink);cursor:pointer}
+.vc button[aria-pressed="true"]{background:var(--clay2);border-color:var(--clay2);color:var(--paper)}
+.box svg.scale{display:block;width:100%;max-width:380px;height:auto;margin:4px auto 12px}
+.box figure.photo{margin:4px 0 6px}.box figure.photo img{display:block;width:100%;max-width:360px;margin:0 auto;border-radius:14px;background:#e4e4e4}.box figcaption{font-size:12px;color:#5a4a36;text-align:center;margin-top:6px}
+.box a.ext{color:var(--clay2);font-weight:700}
+.box p.tip{font-size:13px;color:#5a4a36;margin:12px 0 0}
+.box{max-height:calc(100% - 24px);overflow-y:auto;box-sizing:border-box}
+.abc{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin-top:10px}
+.abc button{position:relative;font:800 34px/1 var(--display);padding:12px 0 16px;border-radius:14px;border:3px solid var(--clay);background:#fff8e6;color:var(--ink);box-shadow:0 4px 0 var(--clay2);cursor:pointer}
+.abc button:active{transform:translateY(3px);box-shadow:0 1px 0 var(--clay2)}
+/* traced letters turn orange, a shade deeper each time (up to three) */
+.abc button.lv1{background:#ffe2bd;border-color:#f0a050}
+.abc button.lv2{background:#ffbf73;border-color:#e07a1f}
+.abc button.lv3{background:#f5901f;border-color:#b85d10;color:#fff}
+#trace{position:absolute;inset:0;z-index:6;background:rgba(20,17,12,.8)}
+#tSkip{position:absolute;right:0;bottom:12px;font:700 14px var(--body);color:var(--paper);opacity:.45;background:transparent;border:1px solid rgba(242,228,193,.4);border-radius:999px;padding:6px 12px;cursor:pointer}
+@media (max-width:600px){#era .t{font-size:16px}.pill{font-size:22px}.btns button{width:44px;height:44px}#note{max-width:80%}}
+@media (prefers-reduced-motion:reduce){.card{animation:none}}
+</style>
+
+<div id="app"><div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <div class="res" id="res"></div>
+    <div id="era"><div class="t" id="eraT"></div><div class="y" id="eraY"></div></div>
+    <div class="btns">
+      <button id="bSay">🔊</button>
+      <button id="bInfo">i</button>
+      <button id="bMenu" aria-label="Menu">≡</button>
+    </div>
+  </div>
+  <aside id="note"></aside>
+  <div id="cards"></div>
+  <div id="ov" hidden><div class="box" id="ovBox"></div></div>
+  <div id="trace" hidden><canvas id="tcv"></canvas><button id="tSkip">overslaan ›</button></div>
+  <div id="sub"></div>
+</div></div>
+
+<script>
+/* ---------- text: Dutch and English (letter tracing is always Dutch) ---------- */
+const STR={
+nl:{
+  tag:'nl-NL', ariaSay:'Zeg het nog eens', ariaInfo:'Uitleg voor de ouder',
+  y8000:'ca. 8000 v.Chr.', y4000:'ca. 4000 v.Chr.', y3400:'ca. 3400 v.Chr.', y500:'ca. 500 v.Chr.', y50:'ca. 50 n.Chr.',
+  wadden:'Waddenzee', rhine:'Rijn', frisians:'Friezen',
+  blocked:'De zee is te wild voor onze kleine kano.',
+  veen:'Dit is moeras. Hier is het nat en zompig.',
+  clayFirst:'Klei! Daar bouwen we de terp van.', clayShort:['Klei!','Nog meer klei!','Klei gevonden!'],
+  clay3:'Genoeg klei voor een terp. Vaar naar het groene land en bouw!',
+  first_deer:'Een hert! Daar kunnen we van eten.', first_fish:'Een vis! Gevangen vanuit de kano.', first_berry:'Bessen! Lekker zoet.',
+  short_deer:['Nog een hert!','Hert!'], short_fish:['Vis!','Nog een vis!'], short_berry:['Bessen!','Mmm, bessen.'],
+  first_wood:'Hout! Daar bouwen we een fort van.', short_wood:['Hout!','Nog meer hout!','Een boomstam!'],
+  first_stone:'Steen! Die komt met het schip uit Duitsland, want in Nederland is bijna geen steen.', short_stone:['Steen!','Nog een steen!'],
+  food3:'We hebben genoeg eten. Zoek een plek om te wonen. Op het hoge gele zand blijven je voeten droog.',
+  harvest:'Kijk, eten van onze eigen boerderij. Daar hoeven we niet voor te jagen!',
+  stormWarn:'Kijk, donkere wolken! Er komt storm. Snel, bouw een terp!',
+  floodWet:'Storm! Het water stroomt over het land. Oh nee, een huis wordt nat!',
+  floodDry:'Storm! Het water stroomt over het land. Maar op de terp blijft het droog!',
+  stormOver:'De storm is voorbij. Het water zakt weer.',
+  stormOverWet:'De storm is voorbij. Het water zakt weer. Het natte huis heeft een terp nodig.',
+  settle:'Hier gaan we wonen! We bouwen een hut. Vanaf nu blijven we op één plek, en worden we boeren.',
+  needFood:'We hebben meer eten nodig. Ga met de kano op jacht!',
+  needClay:'We hebben meer klei nodig. Vaar langs de kwelder en zoek klei.',
+  needWood:'We hebben meer hout nodig. Zoek het bos!',
+  needStone:'We hebben steen nodig. Vaar naar het oosten, daar komt steen aan met het schip.',
+  terpStart:'Tik tik tik! Maak de heuvel hoger en hoger.',
+  huneDone:'Klaar! Een echt hunebed. In Drenthe staan ze er nu nog steeds, na vijfduizend jaar.',
+  terpRaised:'Het huis staat nu hoog en droog. Daar komt het water niet meer.',
+  terpFirst:'Klaar! Een boerderij hoog op de terp. Daar komt het water niet.',
+  terpN:n=>'Weer een terp! Nu hebben we er '+n+'.',
+  back:'Terug', liveHere:'Hier wonen', field:'Akker', cow:'Koe', hunebed:'Hunebed', forward:'Verder in de tijd', terpUnder:'Terp eronder', buildTerp:'Terp bouwen',
+  buildFort:'Fort bouwen', road:'Weg', tradeBtn:'Ruilen',
+  fieldWhere:'Waar maken we de akker? Tik op een plekje naast de hut.',
+  fieldMade:'Een akker! Hier groeit graan. Dan hoeven we niet steeds te jagen.', fieldMore:'Nog een akker!', fieldBad:'Tik op een plekje vlak naast de hut.',
+  cowFirst:'Een koe! De koe eet gras en geeft melk.', cowMore:'Nog een koe!',
+  huneWhere:'Waar bouwen we het hunebed? Tik op een plekje vlak bij de hut.',
+  huneStart:'Mensen sleepten reuzegrote stenen hierheen. Zonder auto en zonder kraan! Tik tik tik, dan tillen we de stenen op.',
+  huneBad:'Tik op een plekje vlak bij de hut.',
+  fortStart:'Tik tik tik! Zet de muren van het fort neer.',
+  fortFirst:'Ons eerste fort! Hier wonen soldaten. Zij passen op de grens.',
+  fortN:n=>'Weer een fort! Nu hebben we er '+n+'.',
+  roadFirst:'Een weg! Over de weg lopen de soldaten van fort naar fort.', roadMore:['Nog een stukje weg.','De weg wordt langer!'],
+  friesHi:'Daar wonen de Friezen, aan de andere kant van de rivier. Bouw eerst een fort, dan komen we terug om te ruilen.',
+  friesHi2:'Hallo Friezen! Zullen we ruilen?',
+  trade:'Wij geven munten, en de Friezen geven een koe. Dat heet ruilen!',
+  travel:'Kom, we reizen verder in de tijd!',
+  era2Title:'Deel 2: Terpen in Friesland',
+  era2Html:'<p>De zeespiegel stijgt. Op de kwelders langs de kust is het gras rijk, maar bij storm loopt het land onder. Mensen gaan wonen op zelfgebouwde heuvels van klei en mest: terpen.</p><p><b>Doel:</b> drie boerderijen op een terp die samen een storm droog doorstaan. Jij kiest waar je bouwt, je kind vaart en stapelt.</p>',
+  toFriesland:'Naar Friesland',
+  era2Narr:'Heel veel jaren later. Nu wonen we bij de zee, in Friesland. Het gras is hier lekker voor de koeien. Maar soms komt de zee over het land. Vaar met de boot en zoek klei. Van klei bouwen we een heuvel: een terp.',
+  winSay:'Hoera! Alle terpen bleven droog. Zo woonden mensen hier meer dan duizend jaar, tot ze dijken gingen bouwen.',
+  winTitle:'Hoog en droog!', winSub:'Einde van deel 2',
+  winHtml:'<p>Jullie gingen van rondtrekkende jagers met een boomstamkano naar boeren met akkers, koeien en een hunebed, en daarna naar terpbewoners aan de zee.</p><p>Maar er komt bezoek uit het zuiden: de Romeinen.</p>',
+  era3Title:'Deel 3: De Romeinen aan de Rijn',
+  era3Html:'<p>De Romeinen veroveren het zuiden van Nederland. Rond het jaar 47 wordt de Rijn de noordgrens van het Romeinse Rijk. Langs de rivier komen forten en een weg: de Limes.</p><p><b>Doel:</b> drie forten op de zuidoever, drie stukken weg, en ruilen met de Friezen aan de overkant. Jij kiest waar de forten komen, niet te dicht op elkaar. Je kind vaart, sjouwt en bouwt.</p>',
+  toRhine:'Naar de Rijn',
+  era3Narr:'Kijk, wie komen daar aan? De Romeinen! Ze komen van heel ver, uit Italië. Ze hebben een groot plat schip. De rivier de Rijn wordt de grens. Haal hout uit het bos, dan bouwen we forten langs de rivier.',
+  win3Say:'Hoera! De forten staan, de weg ligt er, en we ruilen met de Friezen. Dit was de grens van het Romeinse Rijk.',
+  win3Title:'De Limes staat!', win3Sub:'Einde van deel 3',
+  win3Html:'<p>Langs de Rijn stond een rij forten met een weg ertussen: de Limes. De Romeinen bleven ongeveer vierhonderd jaar in Nederland. Sinds 2021 is de Limes Werelderfgoed.</p><p>Volgende keer: de Middeleeuwen, met dijken, molens en de kogge.</p>',
+  playAgain:'Opnieuw spelen', lookAround:'Rondkijken',
+  era1Title:'Deel 1: Jagers in Drenthe',
+  era1Html:'<p>Er zijn nog geen huizen, wegen of steden. Mensen trekken rond om te jagen, vissen en bessen te zoeken.</p><p><b>Zo speel je samen:</b> je kind tikt op de kaart om te varen en te verzamelen. Jij kiest de grote dingen: waar jullie gaan wonen en wat jullie ontdekken. Bij elke ontdekking tekent je kind een letter. Denk hardop, dan leert je kind meedenken.</p>',
+  start:'Start',
+  era1Narr:'Lang, lang geleden, tienduizend jaar terug, waren er nog geen huizen en geen steden. Mensen trokken rond om eten te zoeken. Wij hebben een boomstamkano! Tik op de kaart, dan varen we.',
+  forYou:'Voor jou', ask:'Vraag',
+  n1:['Verken met de kano en verzamel 3 eten (hert, vis, bessen). Kies dan samen een woonplek op het land.','De Kano van Pesse, gevonden in Drenthe, is ongeveer 10.000 jaar oud en de oudste bekende boot ter wereld. Hij ligt in het Drents Museum in Assen.','Waar zou jij wonen: in het natte moeras of op het droge zand?'],
+  n2:['Leg een akker aan (3 eten). Akkers en koeien leveren vanzelf eten op terwijl je kind vaart.','Rond 4000 v.Chr. gingen mensen in deze streek boeren. Ze bleven daardoor op één plek wonen.','Wat is makkelijker: elke dag jagen, of graan laten groeien?'],
+  n3:['Neem een koe (4 eten). Meer akkers kan ook.','Koeien gaven melk, vlees, leer en mest voor de akker.','Wat krijgen we allemaal van een koe?'],
+  n4:['Bouw een hunebed (6 eten) vlak bij de hut. Daarna tikt je kind de stenen omhoog.','Hunebedden zijn gebouwd rond 3400 tot 3000 v.Chr. als graf. Er staan er nog 54 in Nederland, 52 daarvan in Drenthe.','Hoe kregen ze die zware stenen hier, zonder auto of kraan?'],
+  n5:['Deel 1 is klaar. Tik op "Verder in de tijd".','Tussen het hunebed en de terpen zit meer dan 2500 jaar.','Wat denk je dat er verandert als het water stijgt?'],
+  n6:(flood,left,wet)=>[`Verzamel klei (3 per terp) en bouw terpen op de kwelder. Doel: drie boerderijen die een storm droog doorstaan. ${flood?'Nu is het storm.':'Volgende storm over '+left+' stappen.'}`,'Vanaf ongeveer 600 v.Chr. bouwden mensen in Friesland en Groningen terpen (in Groningen: wierden) van klei, graszoden en mest.',wet?'Wat gebeurde er met het huis zonder terp?':'Waarom staat het huis op een heuvel?'],
+  n6done:['Deel 2 is klaar. Tik op "Verder in de tijd" voor de Romeinen.','Toen de Romeinen kwamen, bleven de Friezen gewoon op hun terpen wonen.','Wie denk je dat er nu gaat komen?'],
+  n7:['Haal hout uit het bos. Een fort kost 3 hout en moet op de zuidoever staan, met minstens 2 vakjes tussen de forten. Gele randjes laten zien waar het mag.','Rond het jaar 47 maakte keizer Claudius de Rijn tot grens van het Romeinse Rijk. De eerste forten waren van hout en aarde, later van steen.','Waarom bouwen ze de forten aan de rivier?'],
+  n8:(f,r,tr)=>[`Forten ${f}/3 · weg ${r}/3 · ruilen ${tr?'✓':'nog niet'}. Steen komt per schip uit het oosten. Een stuk weg kost 1 steen en sluit aan op een fort of weg. De Friezen wonen aan de overkant.`,
+    !tr?'De Friezen woonden ten noorden van de Rijn, nog steeds op terpen. Ze betaalden de Romeinen belasting in koeienhuiden. In het jaar 28 kwamen ze daartegen in opstand.':r<3?'In Nederland was bijna geen steen. De Romeinen haalden tufsteen per schip uit Duitsland. In Zwammerdam zijn zes Romeinse schepen gevonden.':'In Utrecht, bij Castellum Hoge Woerd, ligt een Romeins schip dat in De Meern is gevonden.',
+    !tr?'Wat zou jij ruilen met de Romeinen?':r<3?'Waarom is een weg tussen de forten handig?':'Wie woont er aan de andere kant van de grens?'],
+  y1953:'1953', y1986:'1986', factoryL:'Betonfabriek', zeelandL:'Zeeland', haringvlietL:'Haringvliet', oosterscheldeL:'Oosterschelde', westerscheldeL:'Westerschelde', noordzeeL:'Noordzee',
+  damBtn7:'Dam', keringBtn:'Stormvloedkering', closeBtn:'Deuren dicht',
+  rescueFirst:'Gered! Kom maar in de helikopter, je bent veilig.', rescueShort:['Gered!','Nog iemand veilig!','Kom maar mee!'],
+  allRescued:'Iedereen is gered! Het water zakt weer. Nu gaan we zorgen dat dit nooit meer gebeurt.',
+  blockFirst:'Betonblokken! Daarmee bouwen we een dam in de zee.', blockShort:['Beton aan boord!','Nog meer blokken!'],
+  blockEmpty:'De nieuwe blokken worden nog gemaakt. Vlieg even een rondje, dan zijn ze klaar.',
+  needBeton:'We hebben meer betonblokken nodig. Haal ze bij de fabriek.',
+  damStart7:'Plons, plons! We laten de blokken in het water zakken.',
+  damDone7:'De dam is dicht! Hier kan de zee niet meer naar binnen.',
+  keringStart:'Tik tik tik! We bouwen grote pijlers met deuren ertussen.',
+  keringDone:'De stormvloedkering is klaar! Hij heeft grote deuren. Meestal staan ze open, zodat het water en de vissen erdoor kunnen.',
+  stormWarn7:'Kijk, er komt weer een zware storm aan!',
+  closeNow:'Snel, vlieg naar de stormvloedkering en doe de deuren dicht!',
+  closed:'Dicht! De deuren zijn dicht. Nu kan de storm er niet in.',
+  stormHeld7:'De storm raast, maar de Deltawerken houden het water tegen. Iedereen blijft droog!',
+  era7Title:'Deel 7: De watersnood en de Deltawerken',
+  era7Html:'<p>In de nacht van 31 januari op 1 februari 1953 breekt een zware storm de dijken in Zeeland, Zuid-Holland en West-Brabant. Het land loopt onder. Daarna besluit Nederland: dit nooit meer. Zo beginnen de Deltawerken.</p><p><b>Doel:</b> red eerst de mensen met de helikopter. Sluit daarna de zeearmen af met beton. Bij de Oosterschelde kies jij: een dichte dam, of een stormvloedkering die alleen bij storm dichtgaat. Je kind vliegt, redt en bouwt.</p><p class="tip">Bij deze ramp kwamen 1836 mensen om. De verteller zegt dat niet; vertel het je kind op jouw manier, als je dat wilt.</p>',
+  toZeeland:'Naar Zeeland',
+  era7Narr:'Het is 1953. Er is een heel zware storm geweest. De dijken zijn kapot en het water staat in de huizen. Kijk, er zitten mensen op het dak en ze zwaaien! Vlieg met de helikopter naar ze toe en haal ze op.',
+  win7Say:'Hoera! Zeeland is veilig. De Deltawerken beschermen ons tegen de zee.',
+  win7Title:'Veilig achter de Deltawerken', win7Sub:'Einde van deel 7',
+  win7Html:'<p>Na de ramp van 1953 bouwde Nederland de Deltawerken: dammen, sluizen en stormvloedkeringen. De Oosterscheldekering ging in 1986 in gebruik. Hij staat meestal open, zodat het zoute water en de natuur blijven. Alleen bij zware storm gaan de deuren dicht.</p><p>Van een boomstamkano tot de Deltawerken: tienduizend jaar wonen met het water.</p>',
+  n17:(r)=>[`Gered ${r}/6. Vlieg met de helikopter naar de daken waar mensen zwaaien.`,'In de nacht van 31 januari op 1 februari 1953 braken de dijken in Zeeland, Zuid-Holland en West-Brabant. Eerst redden vissers met kleine bootjes mensen van daken en zolders. Daarna kwamen ook helikopters, uit Nederland en andere landen.','Hoe zou het voelen als het water in je huis staat?'],
+  n18:(d,ost)=>[`Dammen ${d}/2. Betonblokken haal je bij de fabriek (rechtsboven). Haringvliet: dam van 3 blokken. Oosterschelde: jij kiest, dam (3) of stormvloedkering (6).`,
+    !ost?'Eerst zou de Oosterschelde helemaal dicht. Maar dan zou de zoute natuur met mosselen en oesters verdwijnen. Daarom kwam er een kering die normaal openstaat.':'De Westerschelde bleef open: dat is de vaarroute naar de haven van Antwerpen. Daar werden juist de dijken hoger.',
+    'Dicht of open: wat zou jij kiezen, en waarom?'],
+  n19:['Er komt storm! Vlieg naar de stormvloedkering en tik op Deuren dicht.','Bij de Brouwersdam liet een kabelbaan zo’n 240.000 betonblokken in het water zakken.','Waarom gaan de deuren alleen bij storm dicht?'],
+  n20:['Deel 7 is klaar!','De Maeslantkering bij Rotterdam werd in 1997 geopend, als laatste stuk van de Deltawerken. In het Watersnoodmuseum in Ouwerkerk kun je meer zien over 1953.','Waar zouden we nu nog goed op het water moeten letten?'],
+  y1840:'ca. 1840', y1852:'1852', haarlemL:'Haarlem', lakeL:'Haarlemmermeer', havenL:'Haven',
+  railBtn:'Rails', pumpBtn:'Gemaal',
+  coalFirst:'Kolen! Die komen met het schip. Kolen maken vuur, en vuur maakt stoom.', coalShort:['Kolen aan boord!','Nog meer kolen!'],
+  coalEmpty:'Het volgende kolenschip is nog onderweg. Vaar even een rondje, of breng de kolen naar een gemaal.',
+  needCoal:'We hebben meer kolen nodig. Haal ze in de haven van Amsterdam.',
+  railStart:'Tik tik! We timmeren de rails vast.',
+  railFirst:'Rails van ijzer! Hier gaat de trein over rijden.', railMore:['Nog een stuk spoor!','Het spoor wordt langer!'],
+  railDone:'Het spoor is klaar! Tuut tuut, daar rijdt De Arend, de eerste trein van Nederland, van Amsterdam naar Haarlem!',
+  pumpStart:'Tik tik tik! We bouwen een gemaal met een grote stoommachine.',
+  pumpFirst:'Het gemaal staat er! Breng kolen, dan gaat de machine pompen.', pumpMore:'Nog een gemaal!',
+  feed:'We gooien de kolen in het vuur. Pfff, stoom! Het gemaal pompt het water weg.', feedShort:['Kolen in het vuur!','Pompen maar!'],
+  lakeDry:'Het meer is weg! Nu is het een grote polder, de Haarlemmermeer. Er komen boerderijen en wegen.',
+  era6Title:'Deel 6: Stoom en de eerste trein',
+  era6Html:'<p>Het Haarlemmermeer is een groot, wild meer dat bij storm steeds meer land wegspoelt. Molens kunnen het niet leegpompen, de nieuwe stoommachines wel. En tussen Amsterdam en Haarlem komt de eerste spoorlijn.</p><p><b>Doel:</b> leg het spoor (7 stukken) en maal het meer droog met drie stoomgemalen. Jij kiest: eerst het spoor, dan haalt de trein meer kolen per keer, of meteen gemalen bouwen. Je kind vaart kolen, timmert rails en stookt de machines.</p>',
+  toMeer:'Naar het Haarlemmermeer',
+  era6Narr:'Dit was bijna tweehonderd jaar geleden. Kijk, een stoomboot! Stoommachines werken op kolen. Ze kunnen veel harder pompen dan molens. Het grote meer eet steeds meer land op. Daar gaan we wat aan doen! En we leggen een spoor voor de eerste trein.',
+  win6Say:'Hoera! De trein rijdt en het meer is droog. Wat een stoomkracht!',
+  win6Title:'Stoomkracht!', win6Sub:'Einde van deel 6',
+  win6Html:'<p>Met stoommachines lukte wat met wind niet ging. Drie stoomgemalen maalden tussen 1849 en 1852 het Haarlemmermeer droog. En in 1839 reed de eerste trein van Amsterdam naar Haarlem.</p><p>Volgende keer: de storm van 1953 en de Deltawerken.</p>',
+  n15:(r,p,lake,coal)=>[`Spoor ${r}/7 · gemalen ${p}/3. Kolen uit de haven → naar een gemaal, dan pompt het. Na een kort rondje komt er een nieuw kolenschip. Spoor klaar: 6 kolen per keer.`,
+    p===0?'Het Haarlemmermeer werd steeds groter. Na twee zware stormen in 1836 besloot men het droog te malen.':lake>0?'Er kwamen drie stoomgemalen: Leeghwater, Cruquius en Lynden. Tussen 1849 en 1852 pompten ze het meer leeg.':'Op 20 september 1839 reed de locomotief De Arend van Amsterdam naar Haarlem. Een kopie staat in het Spoorwegmuseum in Utrecht.',
+    p===0?'Waarom zou je het meer droog willen maken?':r<7?'Wat is slimmer: eerst het spoor, of eerst pompen?':'Hoe zou het zijn om in die eerste trein te zitten?'],
+  n16:['Deel 6 is klaar!','De Haarlemmermeerpolder is ongeveer 18.000 hectare groot. Schiphol ligt er nu in, op de bodem van het oude meer. Gemaal De Cruquius is een museum: je kunt de grote stoommachine nog zien.','Wat staat er nu op plekken waar vroeger water was?'],
+  y1650:'ca. 1650', norway:'Noorwegen', baltic:'Oostzee', zaan:'Zaan', pakhuisL:'Pakhuis', damL:'Dam',
+  houseBtn:'Grachtenhuis', stadBtn:'Stadhuis', sawBtn:'Zaagmolen',
+  woodPort:'Noorwegen! Hier halen we hout uit de grote bossen.', woodPortShort:['Hout aan boord!','Het schip zit vol hout!'],
+  grainPort:'De Oostzee! Hier laden we graan.', grainPortShort:['Graan aan boord!','Het ruim zit vol graan!'],
+  portEmpty:'De nieuwe lading is nog onderweg. Vaar even een rondje, dan is hij er.',
+  sell:'We brengen het graan naar het pakhuis. Dat levert munten op!', sellShort:['Munten!','Weer munten verdiend!'],
+  houseStart:'Eerst palen in de grond, anders zakt het huis weg in de zachte bodem. Tik tik tik, heien maar!',
+  houseFirst:'Een huis aan de gracht! Het staat stevig op palen.', houseMore:['Nog een grachtenhuis!','De gracht wordt mooi vol!'],
+  stadStart:'Het stadhuis wordt heel groot en zwaar. Daar zijn heel veel palen voor nodig. Tik maar flink!',
+  stadDone:'Het stadhuis op de Dam is klaar! Tegenwoordig is het een paleis van de koning.',
+  sawStart:'Tik tik tik! We bouwen een zaagmolen.',
+  sawDone:'De zaagmolen zaagt bomen tot planken. Nu krijgen we meer hout per reis!',
+  needWood5:'We hebben meer hout nodig. Vaar naar Noorwegen!',
+  needCoin:'We hebben meer munten nodig. Haal graan uit de Oostzee en breng het naar het pakhuis.',
+  era5Title:'Deel 5: De Gouden Eeuw in Amsterdam',
+  era5Html:'<p>Amsterdam groeit snel. Met het fluitschip halen handelaars graan uit de Oostzee en hout uit Noorwegen. De stad krijgt nieuwe grachten, en elk huis komt op houten palen in de zachte grond.</p><p><b>Doel:</b> vier grachtenhuizen en het stadhuis op de Dam. Jij beslist wat je koopt: meteen bouwen, of eerst een zaagmolen zodat elke reis meer hout oplevert. Je kind vaart en heit de palen.</p>',
+  toAmsterdam:'Naar Amsterdam',
+  era5Narr:'Kijk eens hoe groot Amsterdam is geworden! Ons nieuwe schip is een fluitschip. Daarmee varen we heel ver: naar Noorwegen voor hout, en naar de Oostzee voor graan. Van het hout bouwen we huizen aan de grachten.',
+  win5Say:'Hoera! De grachten staan vol mooie huizen en het stadhuis is klaar. Amsterdam is een van de rijkste steden van de wereld!',
+  win5Title:'De Gouden Eeuw!', win5Sub:'Einde van deel 5',
+  win5Html:'<p>In de zeventiende eeuw was Amsterdam een van de rijkste steden van de wereld. Schepen brachten graan, hout en specerijen. De stad groeide met de grachtengordel, en het stadhuis op de Dam werd gebouwd op 13.659 houten palen.</p><p>Volgende keer: stoom en de eerste trein.</p>',
+  n13:(h,stad,saw,c)=>[`Huizen ${h}/4 · stadhuis ${stad?'✓':'nog niet'}. Hout uit Noorwegen (links), graan uit de Oostzee (rechts). Graan wordt munten in het pakhuis. Met een zaagmolen geeft elke reis 5 hout in plaats van 3.`,
+    h===0?'Het fluitschip werd rond 1595 in Hoorn ontworpen. Het nam veel lading mee met weinig bemanning, en was daardoor goedkoop om mee te varen.':!saw?'Rond 1594 bouwde Cornelis Corneliszoon de eerste houtzaagmolen. Daarmee zaagde je hout veel sneller dan met de hand.':h<4?'Graan uit de Oostzee was zo belangrijk dat Amsterdammers het de moedernegotie noemden: de moeder van alle handel.':'Het stadhuis op de Dam werd gebouwd tussen 1648 en 1665, op 13.659 houten palen. Nu is het het Koninklijk Paleis.',
+    h===0?'Wat zou jij gaan halen met het schip?':!saw?'Is het slim om eerst een zaagmolen te bouwen?':'Waarom staan de huizen op palen?'],
+  n14:['Deel 5 is klaar!','De grachtengordel werd vanaf 1613 aangelegd en staat sinds 2010 op de Werelderfgoedlijst. De Gouden Eeuw had ook een donkere kant: de VOC en de WIC voerden oorlog en handelden in tot slaaf gemaakte mensen.','Wat vind jij het mooiste aan de stad?'],
+  canoeTitle:'De Kano van Pesse', canoeYr:'ca. 8000 v.Chr. · de oudste boot ter wereld',
+  canoeKid:'Dit is de kano van Pesse. Hij is gemaakt van één boomstam, uitgehold met stenen gereedschap. Hij is tienduizend jaar oud: de oudste boot van de hele wereld! Hij is ongeveer drie meter lang, zo lang als drie kinderen achter elkaar. Je kunt hem echt gaan bekijken, in het museum in Assen.',
+  canoeHtml:'<p><b>Gevonden:</b> in 1955, bij de aanleg van de A28 bij Pesse, zo’n twee meter diep in het veen. De kraanmachinist dacht dat het een boomstam was. Boer Hendrik Wanders zag dat het meer was en liet hem onderzoeken.</p><p><b>Hoe oud:</b> volgens koolstofdatering gemaakt tussen 8040 en 7510 v.Chr.</p><p><b>Gemaakt van:</b> één stam van een grove den, uitgehold met gereedschap van vuursteen of gewei.</p><p><b>Maat:</b> 298 cm lang, 44 cm breed.</p><p><b>Werkt hij echt?</b> In 2001 bouwde archeoloog Jaap Beuker een precieze kopie. Een kanovaarder kon daar gewoon mee varen.</p><p><b>Zien:</b> in het Drents Museum in Assen.</p>',
+  canoeLink:'Meer over de kano ↗ (Wikipedia, Engels)', photoCap:'De echte kano, nu in het Drents Museum · foto: Drents Museum', backMap:'Terug naar de kaart', svgLen:'3 meter', svgYou:'jij',
+  y1250:'ca. 1250', y1400:'ca. 1400', zuiderzee:'Zuiderzee', amstel:'Amstel',
+  clay4First:'Klei! Daar bouwen we de dijk van.',
+  dykeBtn:'Dijk', damBtn:'Dam', millBtn:'Molen', hanzeBtn:'Handelen',
+  stormWarn4:'Kijk, donkere wolken! Er komt storm. Snel, maak de dijk dicht!',
+  ringGap:'Storm! Er zit nog een gat in de dijk. Het water vindt altijd een gat!',
+  ringHolds:'Storm! Maar de dijk houdt het water tegen. Wat een sterke dijk!',
+  stormOver4:'De storm is voorbij. Het water stroomt weer weg.',
+  dykeStart:'Tik tik tik! Stapel de klei hoog op.',
+  dykeFirst:'Een stuk dijk! De dijk houdt de zee tegen.', dykeMore:['Nog een stuk dijk!','De dijk wordt langer!'],
+  damStart:'Tik tik tik! We leggen een dam in de rivier.',
+  damDone:'Een dam in de Amstel. Amstel, dam... Amsterdam! Zo kreeg de stad haar naam.',
+  ringClosed:'De dijk is helemaal dicht! Nu kan de zee er niet meer in.',
+  millStart:'Tik tik tik! We bouwen een molen.',
+  millDone:'De molen draait! Hij pompt het water uit de polder, de rivier in.',
+  polderDry:'Kijk, het land is droog en groen. Dit heet een polder. Nu kunnen de koeien hier grazen.',
+  kampenHi:'Dit is Kampen, een handelsstad. Bouw eerst Amsterdam, dan hebben we iets om te verkopen.',
+  hanzeTrade:'We brengen kaas en boter uit Holland, en krijgen graan en hout terug. Zo werd Holland rijk!',
+  era4Title:'Deel 4: Dijken en molens in Holland',
+  era4Html:'<p>In Holland is het land nat veen. Bij storm komt de zee over het land. Mensen gaan samen dijken bouwen, dammen in rivieren leggen en later molens zetten om het water weg te pompen. Zo ontstaat de polder.</p><p><b>Doel:</b> maak de dijk dicht (4 stukken dijk en een dam in de Amstel), maal de polder droog met een molen, en vaar met de kogge naar Kampen om te handelen. Jij kiest de volgorde; je kind vaart, sjouwt en bouwt.</p>',
+  toHolland:'Naar Holland',
+  era4Narr:'Heel veel jaren later. Kijk, ons nieuwe schip: een kogge! Hier in Holland is het land nat en zacht. Bij storm komt de zee over het land. Haal klei van de kwelder, dan bouwen we een dijk.',
+  win4Say:'Hoera! Holland is droog, Amsterdam is gebouwd en de kogge vaart. Goed gedaan!',
+  win4Title:'Holland is droog!', win4Sub:'Einde van deel 4',
+  win4Html:'<p>Met dijken, dammen en molens maakten mensen van nat veen droog land: polders. Amsterdam begon als een dam in de Amstel, rond 1270. De waterschappen die op de dijken letten, bestaan nu nog steeds.</p><p>Volgende keer: de Gouden Eeuw, met het fluitschip.</p>',
+  n8done:['Deel 3 is klaar. Tik op "Verder in de tijd" voor de Middeleeuwen.','Rond het jaar 1000 begonnen boeren het natte veen in Holland te ontginnen. Ze groeven sloten om het water af te voeren.','Wat heb je nodig om in nat land te wonen?'],
+  n9:(d,dam)=>[`Dijk ${d}/4 · dam ${dam?'✓':'nog niet'}. Een stuk dijk kost 2 klei, de dam in de Amstel 3 klei. Gestippelde vakjes laten zien waar. Klei ligt op de kwelder buiten de dijk. Zolang er een gat is, loopt de polder bij storm onder.`,'Rond 1250 gingen boeren in Holland samen dijken bouwen en onderhouden. Daaruit ontstonden de waterschappen. Die bestaan nu nog steeds.','Wat gebeurt er als er één gaatje in de dijk zit?'],
+  n10:['De dijk is dicht. Bouw een molen (3 hout) op een plek in de polder. De molen pompt het water weg.','Veen zakt in als je het droogmaakt. Daardoor ligt veel van Holland nu onder zeeniveau. Rond 1400 kwamen de eerste windmolens om polders droog te malen.','Waar gaat het water heen dat de molen wegpompt?'],
+  n11:['Vaar met de kogge naar Kampen, aan de overkant van de Zuiderzee, en tik op Handelen.','Kampen was een Hanzestad. Met koggen voeren handelaars over de Zuiderzee naar de Oostzee. In Kampen ligt een nagebouwde kogge.','Wat zou jij in je schip laden?'],
+  n12:['Deel 4 is klaar!','Amsterdam is genoemd naar de dam in de Amstel. De stad wordt rond 1275 voor het eerst genoemd.','Welke stad zou jij een naam geven?'],
+  abcTitle:'Letters oefenen', abcSurprise:'Verrassing!', abcBack:'Terug', abcBtn:'✏️ Letters oefenen',
+  voiceH:'Stem van de verteller', voiceNL:'Stem voor de letters', letterLangH:'Taal van de letters', gameLangH:'Taal van het spel',
+  voiceTip:'★ = mooiere stem. Meer stemmen op de iPad: Instellingen › Toegankelijkheid › Gesproken materiaal › Stemmen › Nederlands. Download daar bijvoorbeeld Claire (Verbeterd), en herlaad dan het spel.',
+  menu:'Menu', noVoice:'<p>Er is geen Nederlandse stem gevonden. Op de iPad: Instellingen › Toegankelijkheid › Gesproken materiaal › Stemmen › Nederlands.</p>',
+  cont:'Verder', soundOn:'Geluid aan', soundOff:'Geluid uit', startOver:'Opnieuw beginnen',
+  really:'Echt opnieuw beginnen?', lost:'<p>Jullie voortgang gaat dan verloren.</p>', no:'Nee', yes:'Ja, opnieuw',
+  tagline:'Geschiedenis voor groot en klein',
+  introHtml:'<p>Van jagers met een boomstamkano tot dijken en molens in Holland. Je kind tikt, vaart, bouwt en tekent letters. Jij kiest de strategie en vertelt waarom.</p><p>Zet het geluid van de iPad aan: de verteller praat mee.</p>',
+  keepPlaying:'Verder spelen', newGame:'Nieuw spel', play:'Spelen', welcome:'Welkom terug! Tik op de kaart om verder te varen.'
+},
+en:{
+  tag:'en-GB', ariaSay:'Say it again', ariaInfo:'Notes for the parent',
+  y8000:'c. 8000 BC', y4000:'c. 4000 BC', y3400:'c. 3400 BC', y500:'c. 500 BC', y50:'c. AD 50',
+  wadden:'Wadden Sea', rhine:'Rhine', frisians:'Frisians',
+  blocked:'The sea is too rough for our little canoe.',
+  veen:'This is a bog. It is wet and squelchy here.',
+  clayFirst:'Clay! We can build a terp with that.', clayShort:['Clay!','More clay!','Found some clay!'],
+  clay3:'Enough clay for a terp. Sail to the green land and build!',
+  first_deer:'A deer! That means food for us.', first_fish:'A fish! Caught from the canoe.', first_berry:'Berries! Lovely and sweet.',
+  short_deer:['Another deer!','A deer!'], short_fish:['A fish!','Another fish!'], short_berry:['Berries!','Mmm, berries.'],
+  first_wood:'Wood! We can build a fort with that.', short_wood:['Wood!','More wood!','A tree trunk!'],
+  first_stone:'Stone! It comes by boat from Germany, because there is hardly any stone in the Netherlands.', short_stone:['Stone!','Another stone!'],
+  food3:'We have enough food. Let\'s find a place to live. On the high yellow sand, our feet stay dry.',
+  harvest:'Look, food from our own farm. We don\'t have to go hunting for that!',
+  stormWarn:'Look, dark clouds! A storm is coming. Quick, build a terp!',
+  floodWet:'Storm! The water is pouring over the land. Oh no, a house is getting wet!',
+  floodDry:'Storm! The water is pouring over the land. But up on the terp it stays dry!',
+  stormOver:'The storm is over. The water is going down again.',
+  stormOverWet:'The storm is over. The water is going down again. The wet house needs a terp.',
+  settle:'We\'ll live here! Let\'s build a hut. From now on we stay in one place, and we become farmers.',
+  needFood:'We need more food. Take the canoe and go hunting!',
+  needClay:'We need more clay. Sail along the salt marsh and look for clay.',
+  needWood:'We need more wood. Find the forest!',
+  needStone:'We need stone. Sail east, where the stone arrives by boat.',
+  terpStart:'Tap tap tap! Make the mound higher and higher.',
+  huneDone:'Finished! A real hunebed. In Drenthe they are still standing today, after five thousand years.',
+  terpRaised:'Now the house stands high and dry. The water can\'t reach it any more.',
+  terpFirst:'Finished! A farm high up on the terp. The water can\'t get there.',
+  terpN:n=>'Another terp! Now we have '+n+'.',
+  back:'Back', liveHere:'Live here', field:'Field', cow:'Cow', hunebed:'Hunebed', forward:'Forward in time', terpUnder:'Terp underneath', buildTerp:'Build a terp',
+  buildFort:'Build a fort', road:'Road', tradeBtn:'Trade',
+  fieldWhere:'Where shall we make the field? Tap a spot next to the hut.',
+  fieldMade:'A field! Grain grows here. Now we don\'t have to hunt all the time.', fieldMore:'Another field!', fieldBad:'Tap a spot right next to the hut.',
+  cowFirst:'A cow! The cow eats grass and gives us milk.', cowMore:'Another cow!',
+  huneWhere:'Where shall we build the hunebed? Tap a spot close to the hut.',
+  huneStart:'People dragged enormous stones all the way here. No cars and no cranes! Tap tap tap, and we lift the stones up.',
+  huneBad:'Tap a spot close to the hut.',
+  fortStart:'Tap tap tap! Put up the walls of the fort.',
+  fortFirst:'Our first fort! Soldiers live here. They guard the border.',
+  fortN:n=>'Another fort! Now we have '+n+'.',
+  roadFirst:'A road! The soldiers walk along it from fort to fort.', roadMore:['Another piece of road.','The road is getting longer!'],
+  friesHi:'The Frisians live here, on the other side of the river. Build a fort first, then we will come back to trade.',
+  friesHi2:'Hello Frisians! Shall we trade?',
+  trade:'We give coins, and the Frisians give a cow. That is called trading!',
+  travel:'Come on, let\'s travel forward in time!',
+  era2Title:'Part 2: Terps in Friesland',
+  era2Html:'<p>The sea level is rising. On the salt marshes along the coast the grass is rich, but in a storm the land floods. People start living on hills they build themselves out of clay and dung: terps.</p><p><b>Goal:</b> three farms on terps that stay dry through a storm together. You decide where to build; your child sails and stacks.</p>',
+  toFriesland:'To Friesland',
+  era2Narr:'Many, many years later. Now we live by the sea, in Friesland. The grass here is good for the cows. But sometimes the sea comes over the land. Sail the boat and look for clay. With clay we build a hill. It is called a terp.',
+  winSay:'Hooray! All the terps stayed dry. People lived like this for more than a thousand years, until they started building dykes.',
+  winTitle:'High and dry!', winSub:'End of part 2',
+  winHtml:'<p>You went from wandering hunters with a dugout canoe to farmers with fields, cows and a hunebed, and then to terp dwellers by the sea.</p><p>But visitors are coming from the south: the Romans.</p>',
+  era3Title:'Part 3: The Romans on the Rhine',
+  era3Html:'<p>The Romans conquer the south of the Netherlands. Around AD 47 the Rhine becomes the northern border of the Roman Empire. Forts and a road appear along the river: the Limes.</p><p><b>Goal:</b> three forts on the south bank, three pieces of road, and a trade with the Frisians across the river. You choose where the forts go, not too close together. Your child sails, carries and builds.</p>',
+  toRhine:'To the Rhine',
+  era3Narr:'Look, who is that coming? The Romans! They come from very far away, from Italy. They have a big flat boat. The river Rhine becomes the border. Fetch wood from the forest, and we will build forts along the river.',
+  win3Say:'Hooray! The forts are standing, the road is built, and we trade with the Frisians. This was the border of the Roman Empire.',
+  win3Title:'The Limes stands!', win3Sub:'End of part 3',
+  win3Html:'<p>Along the Rhine stood a row of forts with a road between them: the Limes. The Romans stayed in the Netherlands for about four hundred years. Since 2021 the Limes has been a World Heritage Site.</p><p>Next time: the Middle Ages, with dykes, windmills and the cog.</p>',
+  playAgain:'Play again', lookAround:'Look around',
+  era1Title:'Part 1: Hunters in Drenthe',
+  era1Html:'<p>There are no houses, roads or towns yet. People move from place to place to hunt, fish and gather berries.</p><p><b>How to play together:</b> your child taps the map to paddle and collect. You choose the big things: where to settle and what to discover. With every discovery your child traces a letter. Think out loud, so your child learns to think along.</p>',
+  start:'Start',
+  era1Narr:'Long, long ago, ten thousand years back, there were no houses and no towns. People wandered about looking for food. We have a canoe made from a tree trunk! Tap the map, and we\'ll paddle there.',
+  forYou:'For you', ask:'Ask',
+  n1:['Explore by canoe and collect 3 food (deer, fish, berries). Then choose a place on land to live, together.','The Pesse canoe, found in Drenthe, is about 10,000 years old and the oldest known boat in the world. It is on display in the Drents Museum in Assen.','Where would you live: in the wet bog or on the dry sand?'],
+  n2:['Make a field (3 food). Fields and cows produce food on their own while your child paddles about.','Around 4000 BC people in this region started farming. That meant they stayed in one place.','What is easier: hunting every day, or growing grain?'],
+  n3:['Get a cow (4 food). More fields work too.','Cows gave milk, meat, leather, and dung for the fields.','What do we get from a cow?'],
+  n4:['Build a hunebed (6 food) close to the hut. Then your child taps the stones into place.','Hunebedden (dolmens) were built as graves around 3400 to 3000 BC. There are 54 left in the Netherlands, 52 of them in Drenthe.','How did they move those heavy stones without cars or cranes?'],
+  n5:['Part 1 is done. Tap "Forward in time".','More than 2,500 years separate the hunebedden from the terps.','What do you think changes when the water rises?'],
+  n6:(flood,left,wet)=>[`Collect clay (3 per terp) and build terps on the salt marsh. Goal: three farms that stay dry through a storm. ${flood?'The storm is on now.':'Next storm in '+left+' steps.'}`,'From about 600 BC people in Friesland and Groningen built terps (called wierden in Groningen) from clay, turf and dung.',wet?'What happened to the house without a terp?':'Why is the house on a hill?'],
+  n6done:['Part 2 is done. Tap "Forward in time" for the Romans.','When the Romans came, the Frisians simply carried on living on their terps.','Who do you think is coming next?'],
+  n7:['Fetch wood from the forest. A fort costs 3 wood and must stand on the south bank, with at least 2 squares between forts. Yellow outlines show where it is allowed.','Around AD 47 Emperor Claudius made the Rhine the border of the Roman Empire. The first forts were built of wood and earth, later of stone.','Why do they build the forts by the river?'],
+  n8:(f,r,tr)=>[`Forts ${f}/3 · road ${r}/3 · trade ${tr?'✓':'not yet'}. Stone arrives by boat in the east. A piece of road costs 1 stone and must join a fort or road. The Frisians live across the river.`,
+    !tr?'The Frisians lived north of the Rhine, still on terps. They paid the Romans taxes in cowhides. In AD 28 they rose up against it.':r<3?'There was hardly any stone in the Netherlands. The Romans brought tuff stone by boat from Germany. Six Roman boats have been found at Zwammerdam.':'In Utrecht, at Castellum Hoge Woerd, you can see a Roman boat that was found at De Meern.',
+    !tr?'What would you trade with the Romans?':r<3?'Why is a road between the forts useful?':'Who lives on the other side of the border?'],
+  y1953:'1953', y1986:'1986', factoryL:'Concrete works', zeelandL:'Zeeland', haringvlietL:'Haringvliet', oosterscheldeL:'Oosterschelde', westerscheldeL:'Westerschelde', noordzeeL:'North Sea',
+  damBtn7:'Dam', keringBtn:'Storm barrier', closeBtn:'Close the gates',
+  rescueFirst:'Rescued! Come into the helicopter, you are safe now.', rescueShort:['Rescued!','Another person safe!','Come along!'],
+  allRescued:'Everyone is rescued! The water is going down. Now we will make sure this never happens again.',
+  blockFirst:'Concrete blocks! We can build a dam in the sea with them.', blockShort:['Concrete on board!','More blocks!'],
+  blockEmpty:'The new blocks are still being made. Fly around for a bit and they will be ready.',
+  needBeton:'We need more concrete blocks. Fetch them from the works.',
+  damStart7:'Splash, splash! We are lowering the blocks into the water.',
+  damDone7:'The dam is closed! The sea cannot get in here any more.',
+  keringStart:'Tap tap tap! We are building big pillars with gates between them.',
+  keringDone:'The storm barrier is finished! It has huge gates. Most of the time they stay open, so the water and the fish can pass through.',
+  stormWarn7:'Look, another heavy storm is coming!',
+  closeNow:'Quick, fly to the storm barrier and close the gates!',
+  closed:'Closed! The gates are shut. Now the storm cannot get in.',
+  stormHeld7:'The storm is raging, but the Delta Works hold back the water. Everyone stays dry!',
+  era7Title:'Part 7: The flood and the Delta Works',
+  era7Html:'<p>On the night of 31 January to 1 February 1953 a heavy storm breaks the dykes in Zeeland, South Holland and West Brabant. The land floods. Afterwards the Netherlands decides: never again. That is how the Delta Works begin.</p><p><b>Goal:</b> first rescue the people by helicopter. Then close off the sea inlets with concrete. At the Oosterschelde you choose: a closed dam, or a storm barrier that only shuts in a storm. Your child flies, rescues and builds.</p><p class="tip">1,836 people died in this disaster. The narrator does not say so; tell your child in your own way, if you want to.</p>',
+  toZeeland:'To Zeeland',
+  era7Narr:'It is 1953. There has been a very heavy storm. The dykes are broken and the water is in the houses. Look, there are people on the roofs, waving! Fly the helicopter over to them and pick them up.',
+  win7Say:'Hooray! Zeeland is safe. The Delta Works protect us from the sea.',
+  win7Title:'Safe behind the Delta Works', win7Sub:'End of part 7',
+  win7Html:'<p>After the disaster of 1953 the Netherlands built the Delta Works: dams, locks and storm surge barriers. The Oosterschelde barrier went into service in 1986. It usually stays open, so the salt water and its nature remain. Only in a heavy storm do the gates close.</p><p>From a dugout canoe to the Delta Works: ten thousand years of living with water.</p>',
+  n17:(r)=>[`Rescued ${r}/6. Fly the helicopter to the roofs where people are waving.`,'On the night of 31 January to 1 February 1953 the dykes broke in Zeeland, South Holland and West Brabant. Fishermen in small boats rescued people from roofs and attics first. Then helicopters came too, from the Netherlands and other countries.','How would it feel if water came into your house?'],
+  n18:(d,ost)=>[`Dams ${d}/2. Fetch concrete blocks at the works (top right). Haringvliet: dam of 3 blocks. Oosterschelde: you choose, dam (3) or storm barrier (6).`,
+    !ost?'The plan was to close the Oosterschelde completely. But then its salt-water nature, with mussels and oysters, would disappear. So a barrier was built that normally stays open.':'The Westerschelde stayed open: it is the shipping route to the port of Antwerp. The dykes along it were raised instead.',
+    'Closed or open: what would you choose, and why?'],
+  n19:['A storm is coming! Fly to the storm barrier and tap Close the gates.','At the Brouwersdam a cable car dropped about 240,000 concrete blocks into the water.','Why do the gates only close in a storm?'],
+  n20:['Part 7 is done!','The Maeslantkering near Rotterdam opened in 1997 as the last part of the Delta Works. The Watersnoodmuseum in Ouwerkerk tells the story of 1953.','Where do we still need to watch the water carefully today?'],
+  y1840:'c. 1840', y1852:'1852', haarlemL:'Haarlem', lakeL:'Haarlemmermeer', havenL:'Harbour',
+  railBtn:'Rails', pumpBtn:'Pumping station',
+  coalFirst:'Coal! It comes by ship. Coal makes fire, and fire makes steam.', coalShort:['Coal on board!','More coal!'],
+  coalEmpty:'The next coal ship is still on its way. Sail around for a bit, or bring the coal to a pumping station.',
+  needCoal:'We need more coal. Fetch it from the harbour in Amsterdam.',
+  railStart:'Tap tap! We are nailing the rails down.',
+  railFirst:'Iron rails! The train will run along here.', railMore:['Another piece of track!','The track is getting longer!'],
+  railDone:'The railway is finished! Toot toot, here comes De Arend, the first train in the Netherlands, from Amsterdam to Haarlem!',
+  pumpStart:'Tap tap tap! We are building a pumping station with a big steam engine.',
+  pumpFirst:'The pumping station is ready! Bring coal, and the engine will start pumping.', pumpMore:'Another pumping station!',
+  feed:'We throw the coal into the fire. Pfff, steam! The pumping station pumps the water away.', feedShort:['Coal on the fire!','Pump away!'],
+  lakeDry:'The lake is gone! Now it is a big polder, the Haarlemmermeer. Farms and roads are coming.',
+  era6Title:'Part 6: Steam and the first train',
+  era6Html:'<p>The Haarlemmermeer is a big, wild lake that washes away more land in every storm. Windmills cannot pump it dry, but the new steam engines can. And the first railway is coming, between Amsterdam and Haarlem.</p><p><b>Goal:</b> lay the railway (7 pieces) and pump the lake dry with three steam pumping stations. You choose: railway first, so the train brings more coal per trip, or pumping stations straight away. Your child ships coal, nails rails and stokes the engines.</p>',
+  toMeer:'To the Haarlemmermeer',
+  era6Narr:'This was almost two hundred years ago. Look, a steamboat! Steam engines run on coal. They can pump much harder than windmills. The big lake keeps eating up the land. We are going to do something about that! And we will lay a railway for the first train.',
+  win6Say:'Hooray! The train is running and the lake is dry. What steam power!',
+  win6Title:'Steam power!', win6Sub:'End of part 6',
+  win6Html:'<p>Steam engines could do what wind could not. Three steam pumping stations drained the Haarlemmermeer between 1849 and 1852. And in 1839 the first train ran from Amsterdam to Haarlem.</p><p>Next time: the storm of 1953 and the Delta Works.</p>',
+  n15:(r,p,lake,coal)=>[`Railway ${r}/7 · stations ${p}/3. Coal from the harbour → to a station, and it pumps. A new coal ship arrives after a short trip. Railway done: 6 coal per trip.`,
+    p===0?'The Haarlemmermeer kept growing. After two heavy storms in 1836 it was decided to pump it dry.':lake>0?'Three steam pumping stations were built: Leeghwater, Cruquius and Lynden. Between 1849 and 1852 they pumped the lake empty.':'On 20 September 1839 the locomotive De Arend ran from Amsterdam to Haarlem. A replica stands in the Railway Museum in Utrecht.',
+    p===0?'Why would you want to make the lake dry?':r<7?'What is smarter: the railway first, or pumping first?':'What would it be like to ride that first train?'],
+  n16:['Part 6 is done!','The Haarlemmermeer polder is about 18,000 hectares. Schiphol airport now lies in it, on the bottom of the old lake. The Cruquius pumping station is a museum: you can still see the giant steam engine.','What stands today in places that used to be water?'],
+  y1650:'c. 1650', norway:'Norway', baltic:'Baltic', zaan:'Zaan', pakhuisL:'Warehouse', damL:'Dam',
+  houseBtn:'Canal house', stadBtn:'Town hall', sawBtn:'Sawmill',
+  woodPort:'Norway! We fetch timber from the big forests here.', woodPortShort:['Timber on board!','The ship is full of wood!'],
+  grainPort:'The Baltic! We load grain here.', grainPortShort:['Grain on board!','The hold is full of grain!'],
+  portEmpty:'The next cargo is still on its way. Sail around for a bit and it will be here.',
+  sell:'We bring the grain to the warehouse. That earns us coins!', sellShort:['Coins!','More coins earned!'],
+  houseStart:'Piles go in first, or the house would sink into the soft ground. Tap tap tap, drive them in!',
+  houseFirst:'A house on the canal! It stands firmly on its piles.', houseMore:['Another canal house!','The canal is filling up nicely!'],
+  stadStart:'The town hall will be very big and heavy. It needs lots and lots of piles. Tap away!',
+  stadDone:'The town hall on the Dam is finished! Today it is a palace of the king.',
+  sawStart:'Tap tap tap! We are building a sawmill.',
+  sawDone:'The sawmill saws trees into planks. Now we get more wood on every trip!',
+  needWood5:'We need more wood. Sail to Norway!',
+  needCoin:'We need more coins. Fetch grain from the Baltic and bring it to the warehouse.',
+  era5Title:'Part 5: The Golden Age in Amsterdam',
+  era5Html:'<p>Amsterdam is growing fast. Merchants sail fluyts to fetch grain from the Baltic and timber from Norway. The city gets new canals, and every house stands on wooden piles in the soft ground.</p><p><b>Goal:</b> four canal houses and the town hall on the Dam. You decide what to buy: build straight away, or first a sawmill so every trip brings more wood. Your child sails and drives in the piles.</p>',
+  toAmsterdam:'To Amsterdam',
+  era5Narr:'Look how big Amsterdam has grown! Our new ship is a fluyt. With it we sail very far: to Norway for timber, and to the Baltic for grain. With the timber we build houses along the canals.',
+  win5Say:'Hooray! The canals are full of beautiful houses and the town hall is finished. Amsterdam is one of the richest cities in the world!',
+  win5Title:'The Golden Age!', win5Sub:'End of part 5',
+  win5Html:'<p>In the seventeenth century Amsterdam was one of the richest cities in the world. Ships brought grain, timber and spices. The city grew with the canal ring, and the town hall on the Dam was built on 13,659 wooden piles.</p><p>Next time: steam and the first train.</p>',
+  n13:(h,stad,saw,c)=>[`Houses ${h}/4 · town hall ${stad?'✓':'not yet'}. Timber from Norway (left), grain from the Baltic (right). Grain becomes coins at the warehouse. With a sawmill every trip brings 5 wood instead of 3.`,
+    h===0?'The fluyt was designed in Hoorn around 1595. It carried a lot of cargo with a small crew, which made it cheap to sail.':!saw?'Around 1594 Cornelis Corneliszoon built the first wind-powered sawmill. It sawed timber far faster than by hand.':h<4?'Grain from the Baltic mattered so much that Amsterdammers called it the moedernegotie: the mother of all trade.':'The town hall on the Dam was built between 1648 and 1665, on 13,659 wooden piles. Today it is the Royal Palace.',
+    h===0?'What would you fetch with the ship?':!saw?'Is it smart to build a sawmill first?':'Why do the houses stand on piles?'],
+  n14:['Part 5 is done!','The canal ring was laid out from 1613 and has been a World Heritage Site since 2010. The Golden Age also had a dark side: the Dutch East and West India Companies waged war and traded in enslaved people.','What do you like best about the city?'],
+  canoeTitle:'The Pesse canoe', canoeYr:'c. 8000 BC · the oldest boat in the world',
+  canoeKid:'This is the Pesse canoe. It was made from one tree trunk, hollowed out with stone tools. It is ten thousand years old: the oldest boat in the whole world! It is about three metres long, as long as three children in a row. You can really go and see it, in the museum in Assen.',
+  canoeHtml:'<p><b>Found:</b> in 1955, while the A28 motorway was being built near Pesse, about two metres down in the peat. The crane operator thought it was a tree trunk. A farmer called Hendrik Wanders saw it was more than that and had it examined.</p><p><b>How old:</b> radiocarbon dating puts it between 8040 and 7510 BC.</p><p><b>Made from:</b> a single trunk of Scots pine, hollowed out with flint or antler tools.</p><p><b>Size:</b> 298 cm long, 44 cm wide.</p><p><b>Does it work?</b> In 2001 archaeologist Jaap Beuker built an exact replica, and a canoeist paddled it without trouble.</p><p><b>See it:</b> at the Drents Museum in Assen.</p>',
+  canoeLink:'More about the canoe ↗ (Wikipedia)', photoCap:'The real canoe, now in the Drents Museum · photo: Drents Museum', backMap:'Back to the map', svgLen:'3 metres', svgYou:'you',
+  y1250:'c. 1250', y1400:'c. 1400', zuiderzee:'Zuiderzee', amstel:'Amstel',
+  clay4First:'Clay! We can build the dyke with that.',
+  dykeBtn:'Dyke', damBtn:'Dam', millBtn:'Windmill', hanzeBtn:'Trade',
+  stormWarn4:'Look, dark clouds! A storm is coming. Quick, close the dyke!',
+  ringGap:'Storm! There is still a gap in the dyke. Water always finds the gap!',
+  ringHolds:'Storm! But the dyke holds the water back. What a strong dyke!',
+  stormOver4:'The storm is over. The water is flowing away again.',
+  dykeStart:'Tap tap tap! Pile the clay up high.',
+  dykeFirst:'A piece of dyke! The dyke holds back the sea.', dykeMore:['Another piece of dyke!','The dyke is getting longer!'],
+  damStart:'Tap tap tap! We are building a dam across the river.',
+  damDone:'A dam in the river Amstel. Amstel, dam... Amsterdam! That is how the city got its name.',
+  ringClosed:'The dyke is closed all the way! Now the sea can\'t get in.',
+  millStart:'Tap tap tap! We are building a windmill.',
+  millDone:'The windmill is turning! It pumps the water out of the polder, into the river.',
+  polderDry:'Look, the land is dry and green. This is called a polder. Now the cows can graze here.',
+  kampenHi:'This is Kampen, a trading town. Build Amsterdam first, then we will have something to sell.',
+  hanzeTrade:'We bring cheese and butter from Holland, and get grain and wood in return. That is how Holland grew rich!',
+  era4Title:'Part 4: Dykes and windmills in Holland',
+  era4Html:'<p>In Holland the land is wet peat. In a storm the sea floods it. People start building dykes together, putting dams across rivers and, later, windmills to pump the water away. That is how the polder came about.</p><p><b>Goal:</b> close the dyke (4 pieces of dyke and a dam in the Amstel), pump the polder dry with a windmill, and sail the cog to Kampen to trade. You choose the order; your child sails, carries and builds.</p>',
+  toHolland:'To Holland',
+  era4Narr:'Many years later. Look, our new ship: a cog! Here in Holland the land is wet and soft. In a storm the sea comes over the land. Fetch clay from the salt marsh, and we will build a dyke.',
+  win4Say:'Hooray! Holland is dry, Amsterdam is built and the cog is sailing. Well done!',
+  win4Title:'Holland is dry!', win4Sub:'End of part 4',
+  win4Html:'<p>With dykes, dams and windmills, people turned wet peat into dry land: polders. Amsterdam began as a dam in the Amstel, around 1270. The water boards that look after the dykes still exist today.</p><p>Next time: the Golden Age, with the fluyt ship.</p>',
+  n8done:['Part 3 is done. Tap "Forward in time" for the Middle Ages.','Around the year 1000 farmers began to cultivate the wet peat in Holland. They dug ditches to drain the water away.','What do you need to live on wet land?'],
+  n9:(d,dam)=>[`Dyke ${d}/4 · dam ${dam?'✓':'not yet'}. A piece of dyke costs 2 clay, the dam in the Amstel 3 clay. Dotted squares show where. Clay lies on the salt marsh outside the dyke. While there is a gap, the polder floods in a storm.`,'Around 1250 farmers in Holland began building and maintaining dykes together. That is where the water boards came from. They still exist today.','What happens if there is one little gap in the dyke?'],
+  n10:['The dyke is closed. Build a windmill (3 wood) somewhere in the polder. The windmill pumps the water away.','Peat sinks when you dry it out. That is why much of Holland now lies below sea level. The first windmills for draining polders appeared around 1400.','Where does the water go that the windmill pumps away?'],
+  n11:['Sail the cog to Kampen, across the Zuiderzee, and tap Trade.','Kampen was a Hanseatic town. Merchants sailed cogs across the Zuiderzee to the Baltic. A rebuilt cog is moored in Kampen.','What would you load onto your ship?'],
+  n12:['Part 4 is done!','Amsterdam is named after the dam in the Amstel. The city is first mentioned around 1275.','What would you name a city?'],
+  abcTitle:'Practise letters', abcSurprise:'Surprise me!', abcBack:'Back', abcBtn:'✏️ Practise letters',
+  voiceH:'Narrator voice', voiceNL:'Voice for the letters', letterLangH:'Letter language', gameLangH:'Game language',
+  voiceTip:'★ = higher-quality voice. For more voices on iPad: Settings › Accessibility › Spoken Content › Voices. Download for example Serena (Enhanced) under English and Claire (Enhanced) under Dutch, then reload the game.',
+  menu:'Menu', noVoice:'<p>No English voice found. On iPad: Settings › Accessibility › Spoken Content › Voices › English.</p>',
+  cont:'Continue', soundOn:'Sound on', soundOff:'Sound off', startOver:'Start over',
+  really:'Really start over?', lost:'<p>Your progress will be lost.</p>', no:'No', yes:'Yes, start over',
+  tagline:'History for big and small',
+  introHtml:'<p>From hunters in a dugout canoe to dykes and windmills in Holland. Your child taps, sails, builds and traces letters. You choose the strategy and explain why.</p><p>Turn the iPad sound on: the narrator talks you through it.</p>',
+  keepPlaying:'Keep playing', newGame:'New game', play:'Play', welcome:'Welcome back! Tap the map to sail on.'
+}};
+let lang='en';
+function t(k,...a){const v=STR[lang][k];return typeof v==='function'?v(...a):v}
+
+/* ---------- constants & state ---------- */
+const COLS=14, ROWS=10, KEY='lagelanden-v2', STEP_MS=300, TERP_MAX=6;
+const BASE=["SSSSSSSSSSSSSS","SSSKKSSSSKKSSS","SKKKKRKKKKKKKS","KKLLLRLLKLLLLK","VVLLVRVLLLLHHB","VVVLVRVVLLHHBB","LVVVVRRVVHHBBB","LLVVVVRRHHBHBB","LLLVVVVRRHHBBH","LLLLVVVVRHHHBB"];
+const MAP3=["SVVVVLLLVVVLLL","SVVLLLVVLLLLBB","SHLLLVVLLLLBBB","SHLLLLLLLLLLBB","SRRRRRLLLLLLLL","SHLLLRRRRRLLLL","SHLLLLLLLRRRRR","SHLLBBLLLLLLLL","SHLBBBLLLBBLLL","SHLLBBLLBBBLLL"];
+const MAP4=["SSSSSSSSSSSSSS","SSSSSSSSSSSSSS","HKKKKRKKKSSSSS","HHHVVRVVHHSSSH","HVVVVRVVVHSSSH","LVVVVRVVVHLSSL","LLVVVRVVLLLSSL","BLLVVRVLLBLSSL","BBLLLRLLBBBLLL","BBBLLRLLBBBLLB"];
+const DYKES=[[3,3],[4,3],[6,3],[7,3]], DAM=[5,3], KAMPEN=[13,3];
+const MAP5=["SSSSSSSSSSSSSS","SSSSSSSSSSSSSS","SSSSSSSSSSSSSS","QQQQQQRQQQQQQQ","QQRRRRRRRRRRQQ","QQQQQQRQQQQQQQ","QQRRRRRRRRRRQQ","QQQQQQRQQQQQQQ","LQRRRRRRRRRRQL","LLQQQQQQQQQQLL"];
+const NORWAY=[0,2], BALTIC=[13,0], PAKHUIS=[7,3], ZAAN=[1,3], DAM5=[6,9];
+const MAP6=["BBLLLLLLLLLSSS","LLLLLLLLLLLSSS","HHQLLLLLLLQSSS","HLLMMMMMMLLLLL","HLMMMMMMMMLLLB","HLMMMMMMMMLLBB","HLLMMMMMMMLLBB","HLLLMMMMMLLBBB","HHLLLLLLLLLBBB","HHHLLLLLLLBBBB"];
+const HAVEN=[11,2], HAARLEM=[2,2], AMS6=[10,2], RAILS6=[[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[9,2]], PUMPS6=[[1,4],[10,4],[5,8]], PUMPNAMES=['Cruquius','Lynden','Leeghwater'];
+const COAL_SVG='<svg viewBox="0 0 32 32"><ellipse cx="11" cy="21" rx="8" ry="6" fill="#2a2a2a"/><ellipse cx="21" cy="20" rx="8" ry="7" fill="#1c1c1c"/><ellipse cx="16" cy="13" rx="7" ry="6" fill="#333"/><ellipse cx="14" cy="11" rx="2.5" ry="1.5" fill="#6a6a6a"/></svg>';
+const MAP7=["SSLLLLLLLLLLLL","SSLLLLLLLLLLLL","SSSRRRRRRRRRRR","SHLLLLLLLLLLLL","SHLLLLLLLLLLLL","SSSRRRRRRRRRRR","SHLLLLLLLLLLLL","SHLLLLLLLLLLLL","SSSRRRRRRRRRRR","SSLLLLLLLLLLLL"];
+const FACTORY=[13,0], DAM7A=[2,2], DAM7B=[2,5], ROOFS7=[[4,3],[8,4],[11,3],[5,6],[9,7],[12,6]];
+const COL={M:'#4b7a90',Q:'#b8a68a',S:'#3f6f87',R:'#5592aa',K:'#8fa47c',V:'#6a6342',L:'#a3ba66',H:'#dcc283',B:'#55804a'};
+const CLAY_SVG='<svg viewBox="0 0 32 32"><ellipse cx="16" cy="21" rx="13" ry="8" fill="#9a5d32"/><ellipse cx="14" cy="16" rx="9" ry="7" fill="#b06c3a"/><ellipse cx="11" cy="13" rx="3.5" ry="2" fill="#d39563"/></svg>';
+const TERP_SVG='<svg viewBox="0 0 48 48" width="44" height="44"><path d="M3 40 Q24 14 45 40Z" fill="#6f8550"/><rect x="13" y="22" width="22" height="9" fill="#7d5a37"/><path d="M11 23 L17 14 L31 14 L37 23Z" fill="#c49b57"/></svg>';
+const HUNE_SVG='<svg viewBox="0 0 48 48" width="44" height="44"><rect x="8" y="22" width="7" height="16" rx="3" fill="#8d8f8a"/><rect x="20" y="23" width="7" height="15" rx="3" fill="#8d8f8a"/><rect x="32" y="22" width="7" height="16" rx="3" fill="#8d8f8a"/><ellipse cx="24" cy="20" rx="20" ry="6" fill="#a2a49e" stroke="#5f615c" stroke-width="2"/></svg>';
+const FORT_SVG='<svg viewBox="0 0 48 48" width="44" height="44"><rect x="8" y="18" width="32" height="20" fill="#8a5a2b"/><rect x="5" y="13" width="9" height="25" fill="#6b4423"/><rect x="34" y="13" width="9" height="25" fill="#6b4423"/><rect x="20" y="26" width="8" height="12" fill="#2a1a0c"/><path d="M24 4v12" stroke="#4a3018" stroke-width="2"/><rect x="24" y="4" width="10" height="7" fill="#b5322a"/></svg>';
+const RES_ICON={food:'🍖',clay:CLAY_SVG,wood:'🪵',stone:'🪨',grain:'🌾',coin:'🪙',coal:COAL_SVG,beton:'🧱'};
+
+const $=id=>document.getElementById(id);
+const cv=$('cv'), ctx=cv.getContext('2d'), tcv=$('tcv'), tctx=tcv.getContext('2d');
+let s=null, mode=null, target=null, anim=null, T=40, ox=0, oy=0, W=0, H=0;
+let parts=[], confetti=[], lastSay=null, muted=false, noteOpen=true, started=false, ovRebuild=null, tr=null;
+
+/* ---------- helpers ---------- */
+const key=(x,y)=>x+','+y;
+const inB=(x,y)=>x>=0&&y>=0&&x<COLS&&y<ROWS;
+const tile=(x,y)=>s.map[y][x];
+function hash(x,y){let h=(x*374761393+y*668265263)|0;h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return (h>>>0)/4294967296}
+const rnd=(x,y,i)=>hash(x*31+i*7+3,y*17+i*13+5);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function isFlooded(x,y){if(!s||s.flood<=0)return false;
+  if(s.era===7){const tt=tile(x,y);if(tt!=='L')return false;if(s.phase7==='flood')return y>=3&&y<=7;return false}
+  if(s.era===2){const tt=tile(x,y);return tt==='K'||(tt==='L'&&y<=3)}
+  if(s.era===4){if(ringClosed()||MAP4[y][x]!=='V')return false;const o=s.obj[key(x,y)];return !(o&&o.kind==='dyke'&&o.p>=4)}
+  return false}
+function onWater(x,y){const o=s.obj[key(x,y)];if(o&&(o.kind==='dyke'||o.kind==='dam')&&o.p>=4)return false;const tt=tile(x,y);return tt==='M'||tt==='S'||tt==='R'||tt==='V'||isFlooded(x,y)}
+function passable(x,y){return inB(x,y)&&!(s.era===1&&tile(x,y)==='S')}
+function reveal(x,y,r){for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++)if(inB(x+dx,y+dy))s.fog[(y+dy)*COLS+x+dx]=1}
+const count=kind=>Object.values(s.obj).filter(o=>o.kind===kind).length;
+function once(id,k){if(s.said[id])return false;s.said[id]=1;say(k);return true}
+// era 3 geography
+function riverMax(x){let m=-1;for(let y=0;y<ROWS;y++)if(tile(x,y)==='R')m=y;return m}
+const southLand=(x,y)=>inB(x,y)&&!'RS'.includes(tile(x,y))&&y>riverMax(x);
+const isBank=(x,y)=>s.era===3&&southLand(x,y)&&tile(x,y-1)==='R';
+const fortList=()=>Object.entries(s.obj).filter(([,o])=>o.kind==='fort').map(([k,o])=>{const [x,y]=k.split(',').map(Number);return {x,y,o}});
+const fortsDone=()=>fortList().filter(f=>f.o.p>=5).length;
+const validFort=(x,y)=>isBank(x,y)&&!s.obj[key(x,y)]&&fortList().every(f=>Math.max(Math.abs(f.x-x),Math.abs(f.y-y))>2);
+function validRoad(x,y){
+  if(s.era!==3||!southLand(x,y)||s.obj[key(x,y)])return false;
+  return [[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>{const o=s.obj[key(x+a,y+b)];return o&&(o.kind==='road'||(o.kind==='fort'&&o.p>=5))});
+}
+
+// era 4 geography
+const objAt=(p)=>s.obj[key(p[0],p[1])];
+const dykesDone=()=>DYKES.filter(p=>{const o=objAt(p);return o&&o.kind==='dyke'&&o.p>=4}).length;
+const damDone=()=>{const o=objAt(DAM);return !!(o&&o.kind==='dam'&&o.p>=4)};
+const ringClosed=()=>s.era===4&&dykesDone()===4&&damDone();
+const inPolder=(x,y)=>inB(x,y)&&MAP4[y][x]==='V'&&!DYKES.some(p=>p[0]===x&&p[1]===y);
+const millDone=()=>Object.values(s.obj).some(o=>o.kind==='mill'&&o.p>=5);
+const isAt=(p,x,y)=>p[0]===x&&p[1]===y;
+
+function newState(){
+  return {v:2,era:1,map:BASE.slice(),fog:Array(COLS*ROWS).fill(0),unit:{x:8,y:9},food:0,clay:0,wood:0,stone:0,village:null,obj:{},
+    res:{'11,7':'deer','12,5':'deer','11,8':'berry','6,6':'fish','5,4':'fish'},cows:[],tech:{akker:0,koe:0,hunebed:0},
+    steps:0,stormAt:0,flood:0,lastWet:false,won:false,won2:false,won3:false,won4:false,won5:false,won6:false,phase7:'flood',saved:0,beton:0,gates:'open',coal:0,rail:false,dry6:false,traded:false,grain:0,coin:0,saw:false,lastPort:null,traded4:false,dry:false,ringSaid:false,said:{},letters:{},yk:'y8000'};
+}
+function migrate(o){
+  const d=newState();for(const k in d)if(!(k in o))o[k]=d[k];
+  if(o.era===2&&o.won){o.won=false;o.won2=true}
+  if(o.era===3&&o.won){o.won=false;o.won3=true}
+  if(o.era===4&&o.won){o.won=false;o.won4=true}
+  if(o.era===5&&o.won){o.won=false;o.won5=true}
+  if(o.era===6&&o.won){o.won=false;o.won6=true}
+  return o;
+}
+
+/* ---------- sound & voice ---------- */
+let ac=null, noiseBuf=null, voice=null, nlVoice=null;
+function initAudio(){
+  try{ if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)();
+    noiseBuf=ac.createBuffer(1,ac.sampleRate,ac.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;}
+    if(ac.state==='suspended')ac.resume();}catch(e){}
+}
+function tone(f,d,type='sine',vol=.12,f2){
+  if(!ac||muted)return;try{const o=ac.createOscillator(),g=ac.createGain(),tm=ac.currentTime;o.type=type;o.frequency.setValueAtTime(f,tm);
+  if(f2)o.frequency.exponentialRampToValueAtTime(f2,tm+d);g.gain.setValueAtTime(vol,tm);g.gain.exponentialRampToValueAtTime(.001,tm+d);
+  o.connect(g).connect(ac.destination);o.start(tm);o.stop(tm+d);}catch(e){}
+}
+function noise(d,vol=.08,freq=800){
+  if(!ac||muted)return;try{const n=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain(),tm=ac.currentTime;n.buffer=noiseBuf;f.type='lowpass';f.frequency.value=freq;
+  g.gain.setValueAtTime(vol,tm);g.gain.exponentialRampToValueAtTime(.001,tm+d);n.connect(f).connect(g).connect(ac.destination);n.start(tm);n.stop(tm+d);}catch(e){}
+}
+const sfx={
+  step(){noise(.18,.05,onWater(s.unit.x,s.unit.y)?1200:400)},
+  get(){tone(660,.12,'triangle',.14);setTimeout(()=>tone(990,.18,'triangle',.12),90)},
+  thud(){tone(140,.25,'square',.08,60);noise(.2,.1,300)},
+  done(){[523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,.25,'triangle',.12),i*110))},
+  no(){tone(300,.2,'sine',.1,200)},
+  tick(){tone(880,.1,'triangle',.1)},
+  thunder(){noise(1.6,.25,180)}
+};
+// prefer high-quality female voices; a voice chosen in the menu always wins
+const FEMALE=/claire|ellen|fleur|colette|fenna|serena|kate|stephanie|martha|fiona|moira|hazel|libby|sonia|susan|female|vrouw/i;
+const MALE=/xander|daniel|arthur|oliver|maarten|george|ryan|male|man\b/i;
+function voicesFor(tag){try{const base=tag.slice(0,2).toLowerCase();return speechSynthesis.getVoices().filter(v=>v.lang.toLowerCase().replace('_','-').startsWith(base))}catch(e){return []}}
+function scoreVoice(v,tag){const id=(v.name+' '+v.voiceURI).toLowerCase();let sc=0;
+  if(/premium/.test(id))sc+=100;else if(/enhanced|verbeterd|natural|neural/.test(id))sc+=60;
+  if(FEMALE.test(v.name))sc+=40;else if(MALE.test(v.name))sc-=40;
+  if(v.lang.toLowerCase().replace('_','-')===tag.toLowerCase())sc+=20;
+  if(/eloquence|compact|novelty|bad news|bells|bubbles|jester|whisper|zarvox|trinoids|organ|cellos|boing|albert|fred|junior|ralph|grandma|grandpa|rocko|shelley|sandy|flo|reed|eddy/i.test(v.name))sc-=200;
+  return sc}
+function findVoice(tag){const vs=voicesFor(tag);if(!vs.length)return null;let want=null;try{want=localStorage.getItem('lagelanden-voice-'+tag)}catch(e){}
+  return vs.find(v=>v.voiceURI===want)||vs.slice().sort((a,b)=>scoreVoice(b,tag)-scoreVoice(a,tag))[0]}
+function voiceChips(tag,cur){
+  const vs=voicesFor(tag).sort((a,b)=>scoreVoice(b,tag)-scoreVoice(a,tag)).filter(v=>scoreVoice(v,tag)>-100).slice(0,8);
+  if(!vs.length)return '';
+  return '<div class="vc">'+vs.map(v=>`<button data-voice="${v.voiceURI.replace(/"/g,'&quot;')}" data-tag="${tag}" aria-pressed="${cur&&cur.voiceURI===v.voiceURI}">${v.name.replace(/\s*\(.*?\)\s*/g,' ').trim()}${/premium|enhanced|verbeterd/i.test(v.name+v.voiceURI)?' ★':''}</button>`).join('')+'</div>'}
+let letterLang='nl';try{letterLang=localStorage.getItem('lagelanden-letters')==='en'?'en':'nl'}catch(e){}
+const letterTag=()=>letterLang==='en'?'en-GB':'nl-NL';
+function pickVoice(){voice=findVoice(STR[lang].tag);nlVoice=findVoice(letterTag())}
+function setLetterLang(l){letterLang=l;try{localStorage.setItem('lagelanden-letters',l)}catch(e){}pickVoice()}
+if('speechSynthesis' in window)speechSynthesis.onvoiceschanged=pickVoice;
+let subTimer=0;
+function say(k,...a){lastSay=[k,a];let v=t(k,...a);if(Array.isArray(v))v=pick(v);speak(v)}
+function speak(text,dutch,shown){
+  const sub=$('sub');sub.textContent=shown||text;sub.classList.toggle('top',!!tr);sub.classList.add('on');clearTimeout(subTimer);subTimer=setTimeout(()=>sub.classList.remove('on'),Math.max(3500,text.length*70));
+  if(muted||!('speechSynthesis' in window))return;
+  const tag=dutch?letterTag():STR[lang].tag,vo=dutch?nlVoice:voice;
+  try{speechSynthesis.cancel();setTimeout(()=>{const u=new SpeechSynthesisUtterance(text);u.lang=tag;if(vo)u.voice=vo;u.rate=.95;u.pitch=1;speechSynthesis.speak(u)},60)}catch(e){}
+}
+function setLang(l){
+  lang=l;try{localStorage.setItem('lagelanden-lang',l)}catch(e){}
+  $('app').lang=STR[l].tag;$('bSay').setAttribute('aria-label',t('ariaSay'));$('bInfo').setAttribute('aria-label',t('ariaInfo'));
+  pickVoice();cardSig='';refresh();
+}
+
+/* ---------- layout ---------- */
+function resize(){
+  const r=$('stage').getBoundingClientRect(),dpr=window.devicePixelRatio||1;W=r.width;H=r.height;
+  for(const [c,cx] of [[cv,ctx],[tcv,tctx]]){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);cx.setTransform(dpr,0,0,dpr,0,0)}
+  const top=68,bottom=118;T=Math.max(20,Math.floor(Math.min(W/COLS,(H-top-bottom)/ROWS)));
+  ox=Math.round((W-T*COLS)/2);oy=Math.round(top+(H-top-bottom-T*ROWS)/2);
+}
+new ResizeObserver(resize).observe($('stage'));
+
+/* ---------- letter tracing ---------- */
+function arc(cx,cy,rx,ry,a0,a1,n=14){const p=[];for(let i=0;i<=n;i++){const a=(a0+(a1-a0)*i/n)*Math.PI/180;p.push([cx+rx*Math.cos(a),cy+ry*Math.sin(a)])}return p}
+// capital letters as strokes in a unit box (x right, y down), in school stroke order
+const LETTERS={
+  K:{w:.8,s:[[[.15,0],[.15,1]],[[.85,0],[.15,.55]],[[.38,.42],[.88,1]]]},
+  D:{w:.8,s:[[[.15,0],[.15,1]],arc(.15,.5,.7,.5,-90,90,18)]},
+  A:{w:.9,s:[[[.5,0],[.08,1]],[[.5,0],[.92,1]],[[.27,.62],[.73,.62]]]},
+  H:{w:.8,s:[[[.12,0],[.12,1]],[[.88,0],[.88,1]],[[.12,.5],[.88,.5]]]},
+  Z:{w:.8,s:[[[.12,0],[.88,0],[.12,1],[.88,1]]]},
+  T:{w:.8,s:[[[.08,0],[.92,0]],[[.5,0],[.5,1]]]},
+  B:{w:.75,s:[[[.15,0],[.15,1]],arc(.15,.25,.62,.25,-90,90),arc(.15,.75,.75,.25,-90,90)]},
+  F:{w:.7,s:[[[.15,0],[.15,1]],[[.15,0],[.88,0]],[[.15,.48],[.72,.48]]]},
+  W:{w:1.15,s:[[[0,0],[.25,1],[.5,.35],[.75,1],[1,0]]]},
+  R:{w:.75,s:[[[.15,0],[.15,1]],arc(.15,.27,.65,.27,-90,90),[[.42,.54],[.9,1]]]},
+  M:{w:.95,s:[[[.1,0],[.1,1]],[[.1,0],[.5,.62],[.9,0],[.9,1]]]},
+  P:{w:.7,s:[[[.15,0],[.15,1]],arc(.15,.27,.65,.27,-90,90)]},
+  O:{w:.85,s:[arc(.5,.5,.46,.5,-90,-450,32)]},
+  G:{w:.85,s:[arc(.5,.5,.46,.5,-40,-360,30),[[.6,.5],[.96,.5],[.96,.72]]]},
+  C:{w:.8,s:[arc(.55,.5,.45,.5,-40,-320,26)]},
+  E:{w:.7,s:[[[.15,0],[.15,1]],[[.15,0],[.85,0]],[[.15,.5],[.72,.5]],[[.15,1],[.85,1]]]},
+  J:{w:.65,s:[[[.75,0],[.75,.7]].concat(arc(.45,.7,.3,.3,0,180,14).slice(1))]},
+  N:{w:.8,s:[[[.12,0],[.12,1]],[[.12,0],[.88,1],[.88,0]]]},
+  U:{w:.8,s:[[[.14,0],[.14,.6]].concat(arc(.5,.6,.36,.4,180,0,16).slice(1)).concat([[.86,0]])]},
+  V:{w:.85,s:[[[.06,0],[.5,1],[.94,0]]]},
+  I:{w:.35,s:[[[.5,0],[.5,1]]]},
+  L:{w:.7,s:[[[.15,0],[.15,1],[.85,1]]]},
+  S:{w:.7,s:[arc(.5,.26,.42,.26,-25,-270,18).concat(arc(.5,.76,.44,.24,-90,155,18).slice(1))]}
+};
+const ICONS={
+  kano:(cx,cy,z)=>withT(z,()=>drawBoat(cx,cy,0,1)),
+  boot:(cx,cy,z)=>withT(z,()=>drawBoat(cx,cy,0,3)),
+  hunebed:(cx,cy,z)=>withT(z,()=>drawHunebed(cx,cy-z*.1,5)),
+  terp:(cx,cy,z)=>withT(z,()=>drawFarm(cx,cy-z*.15,{terp:TERP_MAX,house:true},0)),
+  fort:(cx,cy,z)=>withT(z,()=>drawFort(cx,cy,5)),
+  dorp:(cx,cy,z)=>withT(z,()=>drawHut(cx,cy-z*.05)),
+  kogge:(cx,cy,z)=>withT(z,()=>drawBoat(cx,cy,0,4)),
+  molen:(cx,cy,z)=>withT(z,()=>drawMill(cx,cy-z*.05,5,0)),
+  dijk:(cx,cy,z)=>withT(z,()=>drawDyke(cx-z/2,cy-z/2,4)),
+  amsterdam:(cx,cy,z)=>withT(z,()=>drawCity(cx,cy)),
+  fluitschip:(cx,cy,z)=>withT(z,()=>drawBoat(cx,cy,0,5)),
+  gracht:(cx,cy,z)=>withT(z,()=>drawGrachtHouse(cx,cy-z*.1,6,3,5)),
+  stadhuis:(cx,cy,z)=>withT(z,()=>drawStadhuis(cx,cy,10)),
+  zaagmolen:(cx,cy,z)=>withT(z,()=>drawMill(cx,cy-z*.05,5,0)),
+  stoomboot:(cx,cy,z)=>withT(z,()=>drawBoat(cx,cy,0,6)),
+  gemaal:(cx,cy,z)=>withT(z,()=>drawGemaal(cx,cy-z*.05,6,1,0)),
+  locomotief:(cx,cy,z)=>withT(z*1.3,()=>drawTrain(cx,cy,0)),
+  helikopter:(cx,cy,z)=>withT(z*1.2,()=>drawHeli(cx,cy,0))
+};
+function withT(z,fn){const o=T,c=ctx;T=z;window.__c=c;ctxSwap(tctx);try{fn()}finally{ctxSwap(c);T=o}}
+let dctx=ctx;function ctxSwap(c){dctx=c}
+// Dutch letter names written out, so speech engines say "kaa" rather than an English-sounding "K"
+const NL_NAME={A:'aa',B:'bee',C:'see',D:'dee',E:'ee',F:'ef',G:'gee',H:'haa',I:'ie',J:'jee',K:'kaa',L:'el',M:'em',N:'en',O:'oo',P:'pee',Q:'kuu',R:'er',S:'es',T:'tee',U:'uu',V:'vee',W:'wee',X:'iks',Y:'ei',Z:'zet'};
+const EN_TRACE={kano:['C','canoe'],dorp:['V','village'],akker:['F','field'],koe:['C','cow'],hunebed:['H','hunebed'],zee:['S','sea'],terp:['T','terp'],
+  boot:['B','boat'],fort:['F','fort'],weg:['R','road'],ruilen:['T','trade'],kogge:['C','cog'],dijk:['D','dyke'],amsterdam:['A','Amsterdam'],molen:['W','windmill'],polder:['P','polder'],
+  fluitschip:['F','fluyt'],oostzee:['B','Baltic'],gracht:['C','canal'],zaagmolen:['S','sawmill'],stadhuis:['T','town hall'],stoomboot:['S','steamboat'],ijzer:['I','iron'],gemaal:['P','pump'],
+  locomotief:['L','locomotive'],droog:['D','dry'],helikopter:['H','helicopter'],redden:['R','rescue'],beton:['C','concrete'],veilig:['S','safe']};
+const ABC_EN=[['A','apple','🍎'],['B','boat','⛵'],['C','cat','🐱'],['D','dog','🐶'],['E','egg','🥚'],['F','fish','🐟'],['G','giraffe','🦒'],['H','house','🏠'],['I','ice cream','🍦'],['J','juice','🧃'],['K','kite','🪁'],['L','lion','🦁'],['M','moon','🌙'],['N','nose','👃'],['O','octopus','🐙'],['P','pig','🐷'],['R','rocket','🚀'],['S','snail','🐌'],['T','train','🚂'],['U','umbrella','☂️'],['V','van','🚐'],['W','whale','🐳'],['Z','zebra','🦓']];
+const abcList=()=>letterLang==='en'?ABC_EN:ABC;
+const ABC=[['A','aap','🐒'],['B','boot','⛵'],['C','cadeau','🎁'],['D','dino','🦕'],['E','eend','🦆'],['F','fiets','🚲'],['G','giraf','🦒'],['H','huis','🏠'],['I','inktvis','🐙'],['J','jas','🧥'],['K','kat','🐱'],['L','leeuw','🦁'],['M','maan','🌙'],['N','neus','👃'],['O','olifant','🐘'],['P','paard','🐴'],['R','raket','🚀'],['S','slak','🐌'],['T','trein','🚂'],['U','uil','🦉'],['V','vis','🐟'],['W','walvis','🐳'],['Z','zon','☀️']];
+function stars(){try{return JSON.parse(localStorage.getItem('lagelanden-stars')||'{}')}catch(e){return {}}}
+function addStar(L){const st=stars();st[L]=(st[L]||0)+1;try{localStorage.setItem('lagelanden-stars',JSON.stringify(st))}catch(e){}}
+function showBoard(){
+  const st=stars();
+  overlay(()=>`<h2>${t('abcTitle')}</h2><div class="abc">${abcList().map(([L])=>`<button data-letter="${L}" aria-label="${L}" class="${st[L]?'lv'+Math.min(3,st[L]):''}">${L}</button>`).join('')}</div>`,
+    ()=>[{label:t('abcSurprise'),fn:()=>practice(pick(abcList())[0])},{label:t('abcBack'),alt:1,fn:()=>{if(!started)showTitle()}}]);
+  speak(letterLang==='en'?'Which letter do you want to trace?':'Welke letter wil je tekenen?',true);
+}
+function practice(L){const [,word,emoji]=abcList().find(a=>a[0]===L);startTrace({id:'p_'+L,L,word,emoji,review:false,practice:true,fn:showBoard})}
+function letterThen(id,L,word,emoji,review,fn){
+  if(s.letters[id]){fn();return}
+  startTrace({id,L,word,emoji,review,fn});
+}
+function startTrace(o){
+  if(letterLang==='en'&&!o.practice&&EN_TRACE[o.id]){o={...o,L:EN_TRACE[o.id][0],word:EN_TRACE[o.id][1]}}
+  const {L}=o;
+  tr={...o,si:0,prog:0,done:false,lastMove:performance.now(),down:false};
+  $('trace').hidden=false;
+  const first=!s.letters._intro;
+  if(letterLang==='en'){const line=first?`Trace the letter ${L}. Put your finger on the green dot and follow the line.`:`Trace the letter ${L}. Start at the green dot.`;speak(line,true)}
+  else{const nm=NL_NAME[L],line=x=>first?`Teken de ${x}. Zet je vinger op het groene bolletje en volg de lijn.`:`Teken de ${x}. Begin bij het groene bolletje.`;speak(line(nm),true,line(L))}
+}
+function traceGeom(){
+  // panel = picture (0.55 Lh) + letter (Lh) + word (0.45 Lh); fit it all on screen
+  const def=LETTERS[tr.L],Lh=Math.min((H-40)/2.05,W*.55/def.w,H*.42),Lw=Lh*def.w,lx=(W-Lw)/2,ly=(H-Lh*2.05)/2+Lh*.62;
+  const strokes=def.s.map(st=>{const pts=st.map(([x,y])=>[lx+x*Lw,ly+y*Lh]);const samp=[];let acc=0;
+    for(let i=0;i<pts.length-1;i++){const [ax,ay]=pts[i],[bx,by]=pts[i+1],L=Math.hypot(bx-ax,by-ay),n=Math.max(1,Math.ceil(L/(Lh*.02)));
+      for(let j=(i?1:0);j<=n;j++){samp.push([ax+(bx-ax)*j/n,ay+(by-ay)*j/n,acc+L*j/n])}acc+=L}
+    return {pts,samp,len:acc}});
+  return {Lh,Lw,lx,ly,strokes};
+}
+function pointAt(st,a){for(const p of st.samp)if(p[2]>=a)return p;return st.samp[st.samp.length-1]}
+function traceInput(e){
+  if(!tr||tr.done)return;const r=tcv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,g=traceGeom(),st=g.strokes[tr.si];
+  let best=null,bd=1e9;for(const p of st.samp){if(p[2]<tr.prog-g.Lh*.1||p[2]>tr.prog+g.Lh*.3)continue;const d=Math.hypot(p[0]-px,p[1]-py);if(d<bd){bd=d;best=p}}
+  if(best&&bd<g.Lh*.17){tr.prog=Math.max(tr.prog,best[2]);tr.lastMove=performance.now();
+    if(tr.prog>=st.len-g.Lh*.07){tr.si++;tr.prog=0;
+      if(tr.si>=g.strokes.length)finishTrace();else sfx.tick()}}
+}
+function finishTrace(){
+  tr.done=true;tr.doneAt=performance.now();sfx.done();s.letters._intro=1;
+  const w=tr.word;
+  if(letterLang==='en')speak(tr.review?`${tr.L} again! ${tr.L} is for ${w}.`:`${tr.L}! ${tr.L} is for ${w}.`,true);
+  else{const nm=NL_NAME[tr.L],line=x=>tr.review?`Weer de ${x}! De ${x} van ${w}.`:`De ${x}! De ${x} van ${w}.`;speak(line(nm),true,line(tr.L))}
+  const cur=tr;setTimeout(()=>{if(tr===cur)endTrace()},3200);
+}
+function endTrace(){if(!tr)return;const t0=tr;tr=null;$('trace').hidden=true;if(t0.practice)addStar(t0.L);else{s.letters[t0.id]=1;save();refresh()}t0.fn()}
+tcv.addEventListener('pointerdown',e=>{if(!tr)return;initAudio();tr.down=true;try{tcv.setPointerCapture(e.pointerId)}catch(_){}traceInput(e)});
+tcv.addEventListener('pointermove',e=>{if(tr&&tr.down)traceInput(e)});
+tcv.addEventListener('pointerup',()=>{if(tr)tr.down=false});
+tcv.addEventListener('pointercancel',()=>{if(tr)tr.down=false});
+$('tSkip').onclick=()=>{if(tr&&!tr.done){tr.si=traceGeom().strokes.length;finishTrace()}};
+function drawTrace(now){
+  const c=tctx;c.clearRect(0,0,W,H);if(!tr)return;const g=traceGeom(),Lh=g.Lh;
+  // panel
+  const pw=Math.min(W-8,Math.max(g.Lw,Lh)*1.55),ph=Lh*2.05,px=(W-pw)/2,py=g.ly-Lh*.62;
+  c.fillStyle='#f2e4c1';c.beginPath();c.roundRect(px,py,pw,ph,26);c.fill();c.fillStyle='#6b4424';c.beginPath();c.roundRect(px,py+ph,pw,7,[0,0,8,8]);c.fill();
+  // picture of the word
+  const ic=ICONS[tr.id];const iy=py+Lh*.3;
+  if(ic)ic(W/2,iy,Lh*.42);else{c.font=`${Lh*.3}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(tr.emoji,W/2,iy)}
+  c.lineCap='round';c.lineJoin='round';
+  const line=(pts,col,wid)=>{c.strokeStyle=col;c.lineWidth=wid;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.stroke()};
+  const fat=Lh*.15;
+  g.strokes.forEach(st=>line(st.pts,'#e3cf9f',fat));
+  g.strokes.forEach((st,i)=>{if(tr.done||i<tr.si)line(st.pts,'#5d7a3f',fat)});
+  if(!tr.done){
+    const st=g.strokes[tr.si];
+    c.setLineDash([2,Lh*.05]);line(st.pts,'#8a6a45',Math.max(3,Lh*.025));c.setLineDash([]);
+    const sofar=st.samp.filter(p=>p[2]<=tr.prog);if(sofar.length>1)line(sofar,'#5d7a3f',fat);
+    // arrow
+    const a1=pointAt(st,Math.min(st.len*.5,Lh*.32)),a0=pointAt(st,Math.max(0,Math.min(st.len*.5,Lh*.32)-Lh*.05)),ang=Math.atan2(a1[1]-a0[1],a1[0]-a0[0]);
+    c.save();c.translate(a1[0],a1[1]);c.rotate(ang);c.fillStyle='#a8693b';c.beginPath();c.moveTo(Lh*.06,0);c.lineTo(-Lh*.04,-Lh*.045);c.lineTo(-Lh*.04,Lh*.045);c.closePath();c.fill();c.restore();
+    // start dot
+    const s0=st.pts[0],pr=Lh*(.075+.012*Math.sin(now/220));
+    if(tr.prog<Lh*.05){c.fillStyle='#4f9a3a';c.beginPath();c.arc(s0[0],s0[1],pr,0,7);c.fill();c.fillStyle='#fff';c.font=`800 ${Lh*.08}px Grandstander, sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(String(tr.si+1),s0[0],s0[1]+1)}
+    else{const hp=pointAt(st,tr.prog);c.fillStyle='#4f9a3a';c.beginPath();c.arc(hp[0],hp[1],Lh*.05,0,7);c.fill()}
+    // demo finger when idle
+    const idle=now-tr.lastMove;if(idle>2600){const ph2=((idle-2600)%2200)/2200,p=pointAt(st,ph2*st.len);
+      c.font=`${Lh*.16}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;c.textAlign='left';c.textBaseline='top';c.globalAlpha=.85;c.fillText('👆',p[0]-Lh*.04,p[1]-Lh*.01);c.globalAlpha=1}
+  }else{
+    // the word, first letter highlighted
+    const k=Math.min(1,(now-tr.doneAt)/400),word=tr.word.toUpperCase(),fs=Lh*.2;c.font=`800 ${fs}px Grandstander, sans-serif`;c.textBaseline='middle';
+    const wTot=c.measureText(word).width;let x=W/2-wTot/2;const y=g.ly+Lh*1.22;c.globalAlpha=k;
+    for(let i=0;i<word.length;i++){c.fillStyle=i===0?'#a8693b':'#2a241b';c.textAlign='left';c.fillText(word[i],x,y);x+=c.measureText(word[i]).width}
+    c.globalAlpha=1;
+  }
+}
+
+/* ---------- game flow ---------- */
+function tapMove(x,y){target={x,y};if(!anim)advance()}
+function nextStep(){
+  const u=s.unit;if(!target)return null;const dx=Math.sign(target.x-u.x),dy=Math.sign(target.y-u.y);if(!dx&&!dy)return null;
+  for(const [a,b] of [[dx,dy],[dx,0],[0,dy]]){if((a||b)&&passable(u.x+a,u.y+b))return [u.x+a,u.y+b]}
+  return 'blocked';
+}
+function advance(){
+  const n=nextStep();if(n===null){target=null;return}
+  if(n==='blocked'){target=null;if(s.era===1){sfx.no();say('blocked')}return}
+  anim={fx:s.unit.x,fy:s.unit.y,t0:performance.now()};s.unit.x=n[0];s.unit.y=n[1];sfx.step();
+}
+function step(){
+  s.steps++;const u=s.unit;reveal(u.x,u.y,1);
+  if(s.era===1&&tile(u.x,u.y)==='V')once('veen','veen');
+  if(s.era===3){const o=s.obj[key(u.x,u.y)];if(o&&o.kind==='fries'&&!s.traded){if(fortsDone())once('fries2','friesHi2');else once('fries1','friesHi')}}
+  if(s.era===4&&isAt(KAMPEN,u.x,u.y)&&!damDone())once('kampen1','kampenHi');
+  if(s.era===5)arrive5(u.x,u.y);
+  if(s.era===6)arrive6(u.x,u.y);
+  if(s.era===7)arrive7(u.x,u.y);
+  collect();produce();if(s.steps%3===0)spawn();if(s.era===2||s.era===4)storm();
+  refresh();save();
+}
+function collect(){
+  const k=key(s.unit.x,s.unit.y),r=s.res[k];if(!r)return;delete s.res[k];sfx.get();
+  if(r==='clay'){s.clay++;float(s.unit.x,s.unit.y,'+1','clay');
+    if(s.era===4){if(!once('clay4','clay4First'))say('clayShort');return}
+    if(!once('clay','clayFirst'))say('clayShort');
+    if(s.clay>=3)once('clay3','clay3');return}
+  if(r==='wood'||r==='stone'){s[r]++;float(s.unit.x,s.unit.y,'+1',RES_ICON[r]);if(!once(r,'first_'+r))say('short_'+r);return}
+  s.food++;float(s.unit.x,s.unit.y,'+1','🍖');
+  if(!s.village&&s.food===3){say('food3');s.said.food3=1;return}
+  if(!once(r,'first_'+r))say('short_'+r);
+}
+function produce(){
+  if(s.era!==1)return;let got=0;
+  if(s.steps%6===0)for(const k in s.obj)if(s.obj[k].kind==='field'){const [x,y]=k.split(',').map(Number);s.food++;got++;float(x,y,'+1','🍖')}
+  if(s.steps%5===0)for(const c of s.cows){s.food++;got++;float(c.x,c.y,'+1','🍖')}
+  if(got){tone(784,.15,'triangle',.08);once('harvest','harvest')}
+}
+function spawn(){
+  const vals=Object.values(s.res),n=vals.length,max=s.era===1?6:5;if(n>=max)return;const c=[];
+  if(s.era>=5)return;
+  let wantStone=false;if(s.era===3){const st=vals.filter(v=>v==='stone').length,wd=vals.filter(v=>v==='wood').length;wantStone=st<2&&(wd>=2||Math.random()<.5)}
+  if(s.era===4){const cl=vals.filter(v=>v==='clay').length,wd=vals.filter(v=>v==='wood').length,wantClay=cl<3&&(wd>=2||Math.random()<.6);
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const k=key(x,y);if(s.obj[k]||s.res[k]||(x===s.unit.x&&y===s.unit.y))continue;
+      if(wantClay?tile(x,y)==='K':tile(x,y)==='B')c.push([k,wantClay?'clay':'wood'])}
+    if(c.length){const [k,r]=pick(c);s.res[k]=r}return}
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    const k=key(x,y);if(s.obj[k]||s.res[k]||(x===s.unit.x&&y===s.unit.y))continue;const tt=tile(x,y);
+    if(s.era===1){if(!s.fog[y*COLS+x])continue;if(Math.max(Math.abs(x-s.unit.x),Math.abs(y-s.unit.y))>5)continue;
+      if(tt==='H')c.push([k,'deer']);if(tt==='B')c.push([k,pick(['deer','berry'])]);if(tt==='R')c.push([k,'fish'])}
+    else if(s.era===2){if((tt==='K'||(tt==='L'&&y<=3))&&!isFlooded(x,y))c.push([k,'clay'])}
+    else{if(wantStone){if(tt==='R'&&x>=10)c.push([k,'stone'])}else if(tt==='B')c.push([k,'wood'])}
+  }
+  if(c.length){const [k,r]=pick(c);s.res[k]=r}
+}
+function storm(){
+  if((s.era===2&&s.won2)||(s.era===4&&(s.won4||s.dry)))return;
+  if(s.flood>0){s.flood--;if(s.flood===0)afterStorm();return}
+  const left=s.stormAt-s.steps;
+  if(left===4){sfx.thunder();say(s.era===4?(ringClosed()?'stormWarn4':'stormWarn4'):'stormWarn')}
+  if(left<=0)startFlood();
+}
+function startFlood(){
+  if(s.era===4){s.flood=4;sfx.thunder();setTimeout(sfx.thunder,700);
+    if(ringClosed()){say('ringHolds');return}
+    for(const k in s.obj){const o=s.obj[k],[x,y]=k.split(',').map(Number);if(o.kind==='farm'&&inPolder(x,y))o.wet=true}
+    for(const k in s.res){const [x,y]=k.split(',').map(Number);if(isFlooded(x,y))delete s.res[k]}
+    say('ringGap');return}
+  s.flood=4;let wet=0;sfx.thunder();setTimeout(sfx.thunder,700);
+  for(const k in s.obj){const o=s.obj[k],[x,y]=k.split(',').map(Number);if(o.kind==='farm'&&isFlooded(x,y)&&o.terp<TERP_MAX&&o.house){o.wet=true;wet++}}
+  for(const k in s.res){const [x,y]=k.split(',').map(Number);if(isFlooded(x,y))delete s.res[k]}
+  s.lastWet=wet>0;say(wet?'floodWet':'floodDry');
+}
+function afterStorm(){
+  if(s.era===4){s.stormAt=s.steps+16;if(!ringClosed())say('stormOver4');return}
+  s.stormAt=s.steps+14;const dry=Object.values(s.obj).filter(o=>o.kind==='farm'&&o.terp>=TERP_MAX&&!o.wet).length;
+  if(dry>=3){win2();return}
+  say(s.lastWet?'stormOverWet':'stormOver');
+}
+
+/* ---------- actions ---------- */
+function settle(){
+  const u=s.unit;s.village={x:u.x,y:u.y};s.obj[key(u.x,u.y)]={kind:'hut'};s.yk='y4000';sfx.done();burst(u.x,u.y);refresh();save();
+  letterThen('dorp','D','dorp','🛖',false,()=>say('settle'));
+}
+const near=(x,y,r)=>s.village&&Math.max(Math.abs(x-s.village.x),Math.abs(y-s.village.y))<=r&&!(x===s.village.x&&y===s.village.y);
+const validField=(x,y)=>inB(x,y)&&near(x,y,1)&&'LHB'.includes(tile(x,y))&&!s.obj[key(x,y)];
+const validHune=(x,y)=>inB(x,y)&&near(x,y,2)&&'LHB'.includes(tile(x,y))&&!s.obj[key(x,y)];
+function addCow(){
+  const v=s.village,spots=[];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const x=v.x+dx,y=v.y+dy;if((dx||dy)&&inB(x,y)&&'LHB'.includes(tile(x,y))&&!s.obj[key(x,y)])spots.push({x,y})}
+  const c=spots[s.cows.length%Math.max(1,spots.length)]||{x:v.x,y:v.y};s.cows.push({x:c.x,y:c.y});
+}
+const portReady=name=>s.lastPort!==name||s.steps-(s.portAt||0)>=6;
+function loadedAt(name){s.lastPort=name;s.portAt=s.steps}
+function needLine(res){return s.era===5&&res==='wood'?'needWood5':{food:'needFood',clay:'needClay',wood:'needWood',stone:'needStone',coin:'needCoin',grain:'needCoin',coal:'needCoal',beton:'needBeton'}[res]}
+function buy(cost,res,fn){if(s[res]<cost){sfx.no();say(needLine(res));return}fn()}
+function buyAll(costs,fn){const miss=costs.find(([n,r])=>s[r]<n);if(miss){sfx.no();say(needLine(miss[1]));return}costs.forEach(([n,r])=>s[r]-=n);fn()}
+function startTerp(){
+  const u=s.unit,k=key(u.x,u.y);s.clay-=3;
+  if(!s.obj[k])s.obj[k]={kind:'farm',terp:0,house:false,wet:false};else s.obj[k].terp=0;
+  mode={type:'build',k};say('terpStart');refresh();save();
+}
+function startFort(){
+  const u=s.unit,k=key(u.x,u.y);s.wood-=3;s.obj[k]={kind:'fort',p:0};mode={type:'build',k};say('fortStart');refresh();save();
+}
+function placeRoad(){
+  const u=s.unit,k=key(u.x,u.y);s.stone--;s.obj[k]={kind:'road'};sfx.thud();burst(u.x,u.y);refresh();save();
+  const n=count('road'),after=()=>{say(n===1?'roadFirst':'roadMore');checkWin3()};
+  if(n===1)letterThen('weg','W','weg','🛤️',false,after);else after();
+}
+function doTrade(){
+  const u=s.unit;s.traded=true;sfx.get();float(u.x,u.y,'🪙','🐄');
+  const fs=fortList().filter(f=>f.o.p>=5).sort((a,b)=>Math.hypot(a.x-u.x,a.y-u.y)-Math.hypot(b.x-u.x,b.y-u.y));
+  if(fs[0])s.cows.push({x:fs[0].x,y:fs[0].y});refresh();save();
+  letterThen('ruilen','R','ruilen','🤝',false,()=>{say('trade');checkWin3()});
+}
+// era 4 actions
+function startBuild(kind,cost,res,line){const u=s.unit,k=key(u.x,u.y);s[res]-=cost;s.obj[k]={kind,p:0};mode={type:'build',k};say(line);refresh();save()}
+function dryFarms(){for(const o of Object.values(s.obj))if(o.kind==='farm')o.wet=false;s.flood=0}
+function afterRingPiece(line,...a){
+  if(ringClosed()&&!s.ringSaid){s.ringSaid=true;dryFarms();say('ringClosed')}else say(line,...a);
+  refresh();save();checkWin4();
+}
+function drain(){
+  if(s.dry||!ringClosed()||!millDone())return;
+  const m=Object.entries(s.obj).find(([,o])=>o.kind==='mill'),[mx,my]=m[0].split(',').map(Number),wet=[];
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(MAP4[y][x]==='V'&&tile(x,y)==='V')wet.push([x,y,Math.hypot(x-mx,y-my)]);
+  wet.sort((a,b)=>a[2]-b[2]).slice(0,2).forEach(([x,y])=>{s.map[y]=s.map[y].slice(0,x)+'L'+s.map[y].slice(x+1)});
+  if(wet.length<=2){s.dry=true;s.yk='y1400';
+    const spots=[];for(let y=4;y<=6;y++)for(let x=1;x<=8;x++)if(inPolder(x,y)&&!s.obj[key(x,y)])spots.push({x,y});
+    for(let i=0;i<3&&spots.length;i++)s.cows.push(spots.splice(Math.floor(Math.random()*spots.length),1)[0]);
+    sfx.done();letterThen('polder','P','polder','🐄',false,()=>{say('polderDry');checkWin4()})}
+}
+function doTrade4(){
+  const u=s.unit;s.traded4=true;sfx.get();float(u.x,u.y,'🧀','🌾');refresh();save();say('hanzeTrade');checkWin4();
+}
+// era 5: ports, warehouse, canal houses
+const housesDone=()=>Object.values(s.obj).filter(o=>o.kind==='gracht'&&o.p>=6).length;
+const stadDone=()=>{const o=objAt(DAM5);return !!(o&&o.kind==='stadhuis'&&o.p>=10)};
+function validHouse(x,y){
+  if(s.era!==5||!inB(x,y)||tile(x,y)!=='Q'||s.obj[key(x,y)])return false;
+  if([NORWAY,BALTIC,PAKHUIS,ZAAN,DAM5].some(p=>isAt(p,x,y)))return false;
+  return (inB(x,y-1)&&tile(x,y-1)==='R')||(inB(x,y+1)&&tile(x,y+1)==='R');
+}
+function arrive5(x,y){
+  const port=isAt(NORWAY,x,y)?'wood':isAt(BALTIC,x,y)?'grain':null;
+  if(port){
+    if(!portReady(port)){say('portEmpty');return}
+    loadedAt(port);sfx.get();
+    if(port==='wood'){const n=s.saw?5:3;s.wood+=n;float(x,y,'+'+n,'🪵');if(!once('norway','woodPort'))say('woodPortShort')}
+    else{s.grain+=3;float(x,y,'+3','🌾');if(!s.letters.oostzee){refresh();save();letterThen('oostzee','O','Oostzee','🌾',false,()=>say('grainPort'))}else say('grainPortShort')}
+    return}
+  if(isAt(PAKHUIS,x,y)){s.lastPort='pakhuis';if(s.grain>0){const n=s.grain;s.coin+=n;s.grain=0;sfx.get();float(x,y,'+'+n,'🪙');if(!once('sell','sell'))say('sellShort')}}
+}
+// era 6: coal, rails, steam pumping stations
+const railsDone=()=>RAILS6.filter(p=>{const o=objAt(p);return o&&o.kind==='rail'&&o.p>=2}).length;
+const pumpList=()=>PUMPS6.map(p=>({p,o:objAt(p)})).filter(q=>q.o&&q.o.kind==='gemaal');
+const pumpsDone=()=>pumpList().filter(q=>q.o.p>=6).length;
+function lakeLeft(){let n=0;for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(tile(x,y)==='M')n++;return n}
+function validRail(x,y){
+  if(s.era!==6||s.obj[key(x,y)]||!RAILS6.some(p=>isAt(p,x,y)))return false;
+  return [[1,0],[-1,0]].some(([a])=>{const o=s.obj[key(x+a,y)];return isAt(HAARLEM,x+a,y)||isAt(AMS6,x+a,y)||(o&&o.kind==='rail'&&o.p>=2)});
+}
+const validPump=(x,y)=>s.era===6&&!s.obj[key(x,y)]&&PUMPS6.some(p=>isAt(p,x,y));
+function arrive6(x,y){
+  if(isAt(HAVEN,x,y)){
+    if(!portReady('haven')){say('coalEmpty');return}
+    loadedAt('haven');const n=s.rail?6:4;s.coal+=n;sfx.get();float(x,y,'+'+n,'⚫');if(!once('coal','coalFirst'))say('coalShort');return}
+  const o=s.obj[key(x,y)];
+  if(PUMPS6.some(q=>isAt(q,x,y))&&s.lastPort==='haven')s.lastPort='pump';
+  if(o&&o.kind==='gemaal'&&o.p>=6&&s.coal>0&&!s.dry6){o.fuel=(o.fuel||0)+s.coal*3;s.coal=0;s.lastPort='pump';sfx.get();float(x,y,'🔥','');if(!once('feed','feed'))say('feedShort')}
+}
+function drain6(){
+  let changed=false;
+  for(const {p,o} of pumpList()){if(o.p<6||!(o.fuel>0))continue;
+    let best=null,bd=1e9;for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(tile(x,y)==='M'){const d=Math.hypot(x-p[0],y-p[1]);if(d<bd){bd=d;best=[x,y]}}
+    if(!best)break;s.map[best[1]]=s.map[best[1]].slice(0,best[0])+'L'+s.map[best[1]].slice(best[0]+1);o.fuel--;changed=true}
+  if(changed&&lakeLeft()===0&&!s.dry6){s.dry6=true;s.yk='y1852';pumpList().forEach(q=>q.o.fuel=0);
+    for(const [x,y] of [[4,4],[7,5],[5,6]])if(!s.obj[key(x,y)])s.obj[key(x,y)]={kind:'farm',terp:0,house:true,wet:false};
+    s.cows.push({x:6,y:4},{x:3,y:5});sfx.done();
+    letterThen('droog','D','droog','🌾',true,()=>{say('lakeDry');checkWin6()})}
+  return changed;
+}
+function checkWin6(){if(!s.won6&&s.rail&&s.dry6)setTimeout(win6,2600)}
+setInterval(()=>{if(s&&s.era===6&&!s.dry6&&!tr&&$('ov').hidden&&drain6()){refresh();save()}},650);
+function checkWin5(){if(!s.won5&&housesDone()>=4&&stadDone())setTimeout(win5,2600)}
+function buildTap(){
+  const o=s.obj[mode.k],[x,y]=mode.k.split(',').map(Number);sfx.thud();
+  if(o.kind==='dyke'){o.p++;if(o.p>=4){mode=null;sfx.done();burst(x,y);const n=dykesDone();
+      if(n===1)letterThen('dijk','D','dijk','🧱',true,()=>afterRingPiece('dykeFirst'));else afterRingPiece('dykeMore')}
+    refresh();save();return}
+  if(o.kind==='dam'){o.p++;if(o.p>=4){mode=null;sfx.done();burst(x,y);
+      for(const [cx,cy] of [[4,4],[6,4]])if(!s.obj[key(cx,cy)])s.obj[key(cx,cy)]={kind:'city'};
+      letterThen('amsterdam','A','Amsterdam','🏘️',true,()=>afterRingPiece('damDone'))}
+    refresh();save();return}
+  if(o.kind==='rail'){o.p++;if(o.p>=2){mode=null;sfx.done();burst(x,y);const n=railsDone();
+      if(n===1)letterThen('ijzer','I','ijzer','🔩',false,()=>say('railFirst'));
+      else if(n===RAILS6.length){s.rail=true;letterThen('locomotief','L','locomotief','🚂',false,()=>{say('railDone');checkWin6()})}
+      else say('railMore')}
+    refresh();save();return}
+  if(o.kind==='gemaal'){o.p++;if(o.p>=6){mode=null;sfx.done();burst(x,y);
+      if(pumpsDone()===1)letterThen('gemaal','G','gemaal','🏭',true,()=>say('pumpFirst'));else say('pumpMore')}
+    refresh();save();return}
+  if(o.kind==='dam7'||o.kind==='kering'){o.p++;const full=o.kind==='kering'?8:5;if(o.p>=full){mode=null;sfx.done();burst(x,y);
+      say(o.kind==='kering'?'keringDone':'damDone7');setTimeout(startStorm7,3500)}
+    refresh();save();return}
+  if(o.kind==='gracht'){o.p++;if(o.p>=6){mode=null;sfx.done();burst(x,y);const n=housesDone();
+      if(n===1)letterThen('gracht','G','gracht','🏠',false,()=>{say('houseFirst');checkWin5()});else{say('houseMore');checkWin5()}}
+    refresh();save();return}
+  if(o.kind==='stadhuis'){o.p++;if(o.p>=10){mode=null;sfx.done();burst(x,y);letterThen('stadhuis','S','stadhuis','🏛️',false,()=>{say('stadDone');checkWin5()})}
+    refresh();save();return}
+  if(o.kind==='zaag'){o.p++;if(o.p>=5){mode=null;s.saw=true;sfx.done();burst(x,y);letterThen('zaagmolen','Z','zaagmolen','🪚',true,()=>say('sawDone'))}
+    refresh();save();return}
+  if(o.kind==='mill'){o.p++;if(o.p>=5){mode=null;sfx.done();burst(x,y);letterThen('molen','M','molen','🌬️',false,()=>say('millDone'))}
+    refresh();save();return}
+  if(o.kind==='hunebed'){o.p++;if(o.p>=5){s.tech.hunebed=1;s.yk='y3400';mode=null;sfx.done();burst(x,y);
+      letterThen('hunebed','H','hunebed','🪨',false,()=>say('huneDone'))}}
+  else if(o.kind==='fort'){o.p++;if(o.p>=5){mode=null;sfx.done();burst(x,y);const n=fortsDone(),after=()=>{say(n===1?'fortFirst':'fortN',n);checkWin3()};
+      if(n===1)letterThen('fort','F','fort','🏰',false,after);else after()}}
+  else{o.terp++;if(o.terp>=TERP_MAX){const hadHouse=o.house;o.house=true;o.wet=false;s.cows.push({x,y});mode=null;sfx.done();burst(x,y);
+      const n=Object.values(s.obj).filter(f=>f.kind==='farm'&&f.terp>=TERP_MAX).length;
+      if(hadHouse)say('terpRaised');else if(n===1)letterThen('terp','T','terp','⛰️',false,()=>say('terpFirst'));else say('terpN',n)}}
+  refresh();save();
+}
+function cardList(){
+  const L=[];if(!s||s.won)return L;const u=s.unit,k=key(u.x,u.y),tt=tile(u.x,u.y);
+  if(mode){if(mode.type!=='build')L.push({id:'back',ic:'↩️',label:t('back'),fn:()=>{mode=null;refresh()}});return L}
+  if(s.era===1){
+    if(!s.village){if(s.food>=3&&'HLB'.includes(tt)&&!s.obj[k])L.push({id:'settle',ic:'🛖',label:t('liveHere'),fn:settle})}
+    else{
+      if(count('field')<4)L.push({id:'akker',ic:'🌾',label:t('field'),cost:3,res:'food',fn:()=>buy(3,'food',()=>{mode={type:'field'};say('fieldWhere');refresh()})});
+      if(s.tech.akker&&s.cows.length<3)L.push({id:'koe',ic:'🐄',label:t('cow'),cost:4,res:'food',fn:()=>buy(4,'food',()=>{s.food-=4;s.tech.koe++;addCow();sfx.get();tone(180,.5,'sawtooth',.05,140);refresh();save();
+        if(s.cows.length===1)letterThen('koe','K','koe','🐄',true,()=>say('cowFirst'));else say('cowMore')})});
+      if(s.tech.akker&&s.cows.length&&!s.tech.hunebed&&count('hunebed')===0)L.push({id:'hune',svg:HUNE_SVG,label:t('hunebed'),cost:6,res:'food',fn:()=>buy(6,'food',()=>{mode={type:'hunebed'};say('huneWhere');refresh()})});
+      if(s.tech.hunebed)L.push({id:'verder',ic:'⏳',label:t('forward'),fn:toEra2Intro});
+    }
+  }else if(s.era===2){
+    if(s.won2){L.push({id:'verder3',ic:'⏳',label:t('forward'),fn:toEra3Intro});return L}
+    if(!isFlooded(u.x,u.y)){
+      const o=s.obj[k];
+      if(o&&o.kind==='farm'&&o.house&&o.terp<TERP_MAX)L.push({id:'terp2',svg:TERP_SVG,label:t('terpUnder'),cost:3,res:'clay',fn:()=>buy(3,'clay',startTerp)});
+      else if(!o&&(tt==='K'||(tt==='L'&&u.y<=4)))L.push({id:'terp',svg:TERP_SVG,label:t('buildTerp'),cost:3,res:'clay',fn:()=>buy(3,'clay',startTerp)});
+    }
+  }else if(s.era===7){
+    const place=(kind,cost,line)=>()=>buyAll([[cost,'beton']],()=>{s.obj[k]={kind,p:0};mode={type:'build',k};say(line);refresh();save()});
+    if(s.phase7==='build'||s.phase7==='storm'){
+      if(!s.obj[k]&&isAt(DAM7A,u.x,u.y))L.push({id:'dam7',ic:'🧱',label:t('damBtn7'),costs:[[3,'beton']],fn:place('dam7',3,'damStart7')});
+      if(!s.obj[k]&&isAt(DAM7B,u.x,u.y)){L.push({id:'dam7b',ic:'🧱',label:t('damBtn7'),costs:[[3,'beton']],fn:place('dam7',3,'damStart7')});
+        L.push({id:'kering',ic:'🚪',label:t('keringBtn'),costs:[[6,'beton']],fn:place('kering',6,'keringStart')})}
+      const kk=objAt(DAM7B);if(s.phase7==='storm'&&kk&&kk.kind==='kering'&&kk.p>=8&&s.gates==='open'&&isAt(DAM7B,u.x,u.y))
+        L.push({id:'close',ic:'🔒',label:t('closeBtn'),fn:()=>{s.gates='closed';sfx.thud();setTimeout(sfx.thud,250);say('closed');s.stormLeft=Math.min(s.stormLeft,4);refresh();save()}});
+    }
+  }else if(s.era===6){
+    if(s.won6){L.push({id:'verder7',ic:'⏳',label:t('forward'),fn:toEra7Intro});return L}
+    const place=(kind,line)=>()=>{s.obj[k]={kind,p:0,fuel:0};mode={type:'build',k};say(line);refresh();save()};
+    if(validRail(u.x,u.y))L.push({id:'rail',ic:'🛤️',label:t('railBtn'),fn:place('rail','railStart')});
+    else if(validPump(u.x,u.y))L.push({id:'pump',ic:'🏭',label:t('pumpBtn'),costs:[[2,'coal']],fn:()=>buyAll([[2,'coal']],place('gemaal','pumpStart'))});
+  }else if(s.era===5){
+    if(s.won5){L.push({id:'verder6',ic:'⏳',label:t('forward'),fn:toEra6Intro});return L}
+    const o=s.obj[k],place=(kind,line)=>()=>{s.obj[k]={kind,p:0};mode={type:'build',k};say(line);refresh();save()};
+    if(!o&&isAt(ZAAN,u.x,u.y)&&!s.saw)L.push({id:'saw',ic:'🪚',label:t('sawBtn'),costs:[[3,'coin']],fn:()=>buyAll([[3,'coin']],place('zaag','sawStart'))});
+    else if(!o&&isAt(DAM5,u.x,u.y))L.push({id:'stad',ic:'🏛️',label:t('stadBtn'),costs:[[4,'wood'],[4,'coin']],fn:()=>buyAll([[4,'wood'],[4,'coin']],place('stadhuis','stadStart'))});
+    else if(validHouse(u.x,u.y))L.push({id:'house',ic:'🏠',label:t('houseBtn'),costs:[[3,'wood']],fn:()=>buyAll([[3,'wood']],place('gracht','houseStart'))});
+  }else if(s.era===4){
+    if(s.won4){L.push({id:'verder5',ic:'⏳',label:t('forward'),fn:toEra5Intro});return L}
+    const o=s.obj[k];
+    if(!o&&DYKES.some(p=>isAt(p,u.x,u.y)))L.push({id:'dyke',ic:'🧱',label:t('dykeBtn'),cost:2,res:'clay',fn:()=>buy(2,'clay',()=>startBuild('dyke',2,'clay','dykeStart'))});
+    else if(!o&&isAt(DAM,u.x,u.y))L.push({id:'dam',ic:'🪵',label:t('damBtn'),cost:3,res:'clay',fn:()=>buy(3,'clay',()=>startBuild('dam',3,'clay','damStart'))});
+    else if(!o&&ringClosed()&&!Object.values(s.obj).some(m=>m.kind==='mill')&&inPolder(u.x,u.y))L.push({id:'mill',ic:'🌬️',label:t('millBtn'),cost:3,res:'wood',fn:()=>buy(3,'wood',()=>startBuild('mill',3,'wood','millStart'))});
+    else if(o&&o.kind==='hanze'&&damDone()&&!s.traded4)L.push({id:'hanze',ic:'⚖️',label:t('hanzeBtn'),fn:doTrade4});
+  }else{
+    if(s.won3){L.push({id:'verder4',ic:'⏳',label:t('forward'),fn:toEra4Intro});return L}
+    const o=s.obj[k];
+    if(o&&o.kind==='fries'&&!s.traded&&fortsDone()>=1)L.push({id:'trade',ic:'🤝',label:t('tradeBtn'),fn:doTrade});
+    else if(validFort(u.x,u.y))L.push({id:'fort',svg:FORT_SVG,label:t('buildFort'),cost:3,res:'wood',fn:()=>buy(3,'wood',startFort)});
+    else if(validRoad(u.x,u.y))L.push({id:'road',ic:'🛤️',label:t('road'),cost:1,res:'stone',fn:()=>buy(1,'stone',placeRoad)});
+  }
+  return L;
+}
+
+/* ---------- eras ---------- */
+function toEra2Intro(){
+  say('travel');
+  overlay(()=>`<h2>${t('era2Title')}</h2><div class="yr">${t('y500')}</div>${t('era2Html')}`,
+    ()=>[{label:t('toFriesland'),fn:()=>{goEra2();letterThen('zee','Z','zee','🌊',false,()=>say('era2Narr'))}}]);
+}
+function goEra2(){
+  s.era=2;s.map=BASE.slice();s.map[1]='SSSSSSSSSSSSSS';s.fog.fill(1);s.unit={x:5,y:2};s.res={};s.yk='y500';s.clay=0;s.flood=0;
+  s.obj['2,2']={kind:'farm',terp:0,house:true,wet:false};s.stormAt=s.steps+10;for(let i=0;i<4;i++)spawn();
+  target=null;mode=null;refresh();save();
+}
+function win2(){
+  s.won2=true;sfx.done();for(let i=0;i<5;i++)setTimeout(()=>burst(2+Math.random()*10,2+Math.random()*2),i*250);
+  say('winSay');
+  setTimeout(()=>overlay(()=>`<h1>${t('winTitle')}</h1><div class="yr">${t('winSub')}</div>${t('winHtml')}`,
+    ()=>[{label:t('forward'),fn:toEra3Intro},{label:t('lookAround'),alt:1,fn:()=>{}}]),2500);
+  refresh();save();
+}
+function toEra3Intro(){
+  say('travel');
+  overlay(()=>`<h2>${t('era3Title')}</h2><div class="yr">${t('y50')}</div>${t('era3Html')}`,
+    ()=>[{label:t('toRhine'),fn:()=>{goEra3();letterThen('boot','B','boot','⛵',false,()=>say('era3Narr'))}}]);
+}
+function goEra3(){
+  s.era=3;s.map=MAP3.slice();s.fog.fill(0);s.unit={x:13,y:6};s.yk='y50';s.flood=0;s.wood=0;s.stone=0;s.traded=false;s.cows=[];
+  s.obj={'3,2':{kind:'fries'}};s.res={'12,6':'stone','10,8':'wood','9,9':'wood','4,8':'wood'};
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(tile(x,y)==='R')reveal(x,y,0);
+  reveal(13,6,2);target=null;mode=null;refresh();save();
+}
+function checkWin3(){if(!s.won3&&fortsDone()>=3&&s.traded&&count('road')>=3)setTimeout(win3,2600)}
+function win3(){
+  if(s.won3)return;s.won3=true;sfx.done();for(let i=0;i<5;i++)setTimeout(()=>burst(2+Math.random()*10,5+Math.random()*3),i*250);
+  say('win3Say');
+  setTimeout(()=>overlay(()=>`<h1>${t('win3Title')}</h1><div class="yr">${t('win3Sub')}</div>${t('win3Html')}`,
+    ()=>[{label:t('forward'),fn:toEra4Intro},{label:t('lookAround'),alt:1,fn:()=>{}}]),3000);
+  refresh();save();
+}
+function toEra4Intro(){
+  say('travel');
+  overlay(()=>`<h2>${t('era4Title')}</h2><div class="yr">${t('y1250')}</div>${t('era4Html')}`,
+    ()=>[{label:t('toHolland'),fn:()=>{goEra4();letterThen('kogge','K','kogge','⛵',true,()=>say('era4Narr'))}}]);
+}
+function goEra4(){
+  s.era=4;s.map=MAP4.slice();s.fog.fill(0);for(let y=0;y<ROWS;y++)for(let x=0;x<=9;x++)s.fog[y*COLS+x]=1;
+  s.unit={x:5,y:2};s.yk='y1250';s.flood=0;s.clay=0;s.wood=0;s.cows=[];s.traded4=false;s.dry=false;s.ringSaid=false;
+  s.obj={'2,5':{kind:'farm',terp:0,house:true,wet:false},'7,6':{kind:'farm',terp:0,house:true,wet:false},[key(...KAMPEN)]:{kind:'hanze'}};
+  s.res={'2,2':'clay','7,2':'clay','0,8':'wood','9,8':'wood'};s.stormAt=s.steps+16;
+  target=null;mode=null;cardSig='';refresh();save();
+}
+function checkWin4(){if(!s.won4&&ringClosed()&&s.dry&&s.traded4)setTimeout(win4,2600)}
+function win4(){
+  if(s.won4)return;s.won4=true;sfx.done();for(let i=0;i<5;i++)setTimeout(()=>burst(2+Math.random()*6,4+Math.random()*3),i*250);
+  say('win4Say');
+  setTimeout(()=>overlay(()=>`<h1>${t('win4Title')}</h1><div class="yr">${t('win4Sub')}</div>${t('win4Html')}`,
+    ()=>[{label:t('forward'),fn:toEra5Intro},{label:t('lookAround'),alt:1,fn:()=>{}}]),3000);
+  refresh();save();
+}
+function toEra5Intro(){
+  say('travel');
+  overlay(()=>`<h2>${t('era5Title')}</h2><div class="yr">${t('y1650')}</div>${t('era5Html')}`,
+    ()=>[{label:t('toAmsterdam'),fn:()=>{goEra5();letterThen('fluitschip','F','fluitschip','⛵',true,()=>say('era5Narr'))}}]);
+}
+function goEra5(){
+  s.era=5;s.map=MAP5.slice();s.fog.fill(1);s.unit={x:6,y:2};s.yk='y1650';s.flood=0;s.wood=0;s.grain=0;s.coin=0;s.saw=false;s.lastPort=null;s.cows=[];
+  s.obj={[key(...PAKHUIS)]:{kind:'pakhuis'},[key(...NORWAY)]:{kind:'port',res:'wood'},[key(...BALTIC)]:{kind:'port',res:'grain'}};s.res={};
+  target=null;mode=null;cardSig='';refresh();save();
+}
+function win5(){
+  if(s.won5)return;s.won5=true;sfx.done();for(let i=0;i<5;i++)setTimeout(()=>burst(2+Math.random()*10,4+Math.random()*4),i*250);
+  say('win5Say');
+  setTimeout(()=>overlay(()=>`<h1>${t('win5Title')}</h1><div class="yr">${t('win5Sub')}</div>${t('win5Html')}`,
+    ()=>[{label:t('forward'),fn:toEra6Intro},{label:t('lookAround'),alt:1,fn:()=>{}}]),3000);
+  refresh();save();
+}
+function toEra6Intro(){
+  say('travel');
+  overlay(()=>`<h2>${t('era6Title')}</h2><div class="yr">${t('y1840')}</div>${t('era6Html')}`,
+    ()=>[{label:t('toMeer'),fn:()=>{goEra6();letterThen('stoomboot','S','stoomboot','🚢',true,()=>say('era6Narr'))}}]);
+}
+function goEra6(){
+  s.era=6;s.map=MAP6.slice();s.fog.fill(1);s.unit={x:12,y:2};s.yk='y1840';s.flood=0;s.coal=0;s.rail=false;s.dry6=false;s.lastPort=null;s.cows=[];
+  s.obj={[key(...HAVEN)]:{kind:'haven'},[key(...HAARLEM)]:{kind:'city'},[key(...AMS6)]:{kind:'city'}};s.res={};
+  target=null;mode=null;cardSig='';refresh();save();
+}
+function win6(){
+  if(s.won6)return;s.won6=true;sfx.done();for(let i=0;i<5;i++)setTimeout(()=>burst(2+Math.random()*9,3+Math.random()*5),i*250);
+  say('win6Say');
+  setTimeout(()=>overlay(()=>`<h1>${t('win6Title')}</h1><div class="yr">${t('win6Sub')}</div>${t('win6Html')}`,
+    ()=>[{label:t('forward'),fn:toEra7Intro},{label:t('lookAround'),alt:1,fn:()=>{}}]),3000);
+  refresh();save();
+}
+// ---------- era 7: 1953 and the Delta Works ----------
+function toEra7Intro(){
+  say('travel');
+  overlay(()=>`<h2>${t('era7Title')}</h2><div class="yr">${t('y1953')}</div>${t('era7Html')}`,
+    ()=>[{label:t('toZeeland'),fn:()=>{goEra7();letterThen('helikopter','H','helikopter','🚁',true,()=>say('era7Narr'))}}]);
+}
+function goEra7(){
+  s.era=7;s.map=MAP7.slice();s.fog.fill(1);s.unit={x:12,y:0};s.yk='y1953';s.flood=1;s.phase7='flood';s.saved=0;s.beton=0;s.gates='open';s.lastPort=null;s.cows=[];
+  s.obj={[key(...FACTORY)]:{kind:'factory'}};ROOFS7.forEach(p=>s.obj[key(...p)]={kind:'roof',saved:false});s.res={};s.stormAt=0;
+  target=null;mode=null;cardSig='';refresh();save();
+}
+const closures7=()=>[DAM7A,DAM7B].filter(p=>{const o=objAt(p);return o&&(o.kind==='dam7'||o.kind==='kering')&&o.p>=(o.kind==='kering'?8:5)}).length;
+function arrive7(x,y){
+  const o=s.obj[key(x,y)];
+  if(s.phase7==='flood'){
+    if(o&&o.kind==='roof'&&!o.saved){o.saved=true;s.saved++;sfx.get();float(x,y,'🙋','');
+      const after=()=>{if(s.saved>=ROOFS7.length){s.phase7='build';s.flood=0;s.yk='y1953';sfx.done();say('allRescued')}refresh();save()};
+      if(s.saved===1)letterThen('redden','R','redden','🛟',true,()=>{say('rescueFirst');after()});else{say('rescueShort');after()}}
+    return}
+  if(isAt(FACTORY,x,y)){
+    if(!portReady('factory')){say('blockEmpty');return}
+    loadedAt('factory');s.beton+=3;sfx.get();float(x,y,'+3','🧱');
+    if(!s.letters.beton){refresh();save();letterThen('beton','B','beton','🧱',true,()=>say('blockFirst'))}else say('blockShort');return}
+  if(isAt(DAM7A,x,y)||isAt(DAM7B,x,y))s.lastPort='dam';
+}
+const STORM7=14;
+function storm7(){
+  if(s.era!==7||s.phase7!=='storm'||tr||!$('ov').hidden)return;
+  const k=objAt(DAM7B),mustClose=k&&k.kind==='kering'&&s.gates==='open';
+  if(mustClose&&s.stormLeft<=5){if(!s.said.closeNow){s.said.closeNow=1;sfx.thunder();say('closeNow')}return}
+  s.stormLeft--;if(s.stormLeft===9)sfx.thunder();
+  if(s.stormLeft<=0){s.phase7='held';sfx.thunder();setTimeout(sfx.thunder,600);say('stormHeld7');setTimeout(()=>{letterThen('veilig','V','veilig','🛡️',false,()=>win7())},5200)}
+  refresh();save();
+}
+setInterval(storm7,1000);
+function startStorm7(){if(s.phase7==='build'&&closures7()===2){s.phase7='storm';s.stormLeft=STORM7;s.said.closeNow=0;say('stormWarn7');refresh();save()}}
+function win7(){
+  if(s.won)return;s.won=true;s.flood=0;s.gates='open';s.yk='y1986';sfx.done();for(let i=0;i<5;i++)setTimeout(()=>burst(2+Math.random()*10,2+Math.random()*6),i*250);
+  say('win7Say');
+  setTimeout(()=>overlay(()=>`<h1>${t('win7Title')}</h1><div class="yr">${t('win7Sub')}</div>${t('win7Html')}`,
+    ()=>[{label:t('playAgain'),fn:()=>{s=newState();reveal(8,9,2);cardSig='';save();intro1()}},{label:t('lookAround'),alt:1,fn:()=>{}}]),3000);
+  refresh();save();
+}
+function intro1(){
+  overlay(()=>`<h2>${t('era1Title')}</h2><div class="yr">${t('y8000')}</div>${t('era1Html')}`,
+    ()=>[{label:t('start'),fn:()=>{refresh();letterThen('kano','K','kano','🛶',false,()=>say('era1Narr'))}}]);
+}
+
+/* ---------- UI ---------- */
+// html and btns are functions so the overlay can re-render in the other language
+function overlay(html,btns,withLang){
+  ovRebuild=()=>overlay(html,btns,withLang);
+  const box=$('ovBox');
+  const lng=(withLang==='menu'?`<div class="vh" style="text-align:center;margin-top:0">${t('gameLangH')}</div>`:'')+(withLang?`<div class="lng" role="group" aria-label="Language / Taal"><button data-l="nl" aria-pressed="${lang==='nl'}">Nederlands</button><button data-l="en" aria-pressed="${lang==='en'}">English</button></div>`:'');
+  box.innerHTML=lng+html()+'<div class="row"></div>';
+  box.querySelectorAll('.lng button').forEach(b=>b.onclick=()=>{initAudio();setLang(b.dataset.l);ovRebuild()});
+  box.querySelectorAll('[data-ll]').forEach(b=>b.onclick=()=>{initAudio();setLetterLang(b.dataset.ll);speak(b.dataset.ll==='en'?'C is for canoe.':'De kaa van kano.',true);ovRebuild()});
+  box.querySelectorAll('[data-letter]').forEach(b=>b.onclick=()=>{initAudio();$('ov').hidden=true;ovRebuild=null;practice(b.dataset.letter)});
+  box.querySelectorAll('[data-voice]').forEach(b=>b.onclick=()=>{initAudio();const tg=b.dataset.tag;try{localStorage.setItem('lagelanden-voice-'+tg,b.dataset.voice)}catch(e){}
+    pickVoice();const nl=tg==='nl-NL',forLetters=tg===letterTag()&&tg!==STR[lang].tag;speak(nl?'Hallo! Zullen we gaan varen? De kaa van kano.':'Hello! Shall we go sailing? C is for canoe.',forLetters);ovRebuild()});
+  const row=box.querySelector('.row');
+  for(const b of btns()){const el=document.createElement('button');el.className='big'+(b.alt?' alt':'');el.textContent=b.label;
+    el.onclick=()=>{initAudio();$('ov').hidden=true;ovRebuild=null;b.fn()};row.appendChild(el)}
+  $('ov').hidden=false;
+}
+let cardSig='';
+function refresh(){
+  if(!s)return;
+  const res=$('res');
+  if(s.era===1)res.innerHTML=`<div class="pill">🍖 ${s.food}</div>`;
+  else if(s.era===2){const left=Math.max(0,s.stormAt-s.steps),frac=s.flood>0?1:Math.min(1,1-left/14);
+    res.innerHTML=`<div class="pill">${CLAY_SVG} ${s.clay}</div>`+(s.won2?'':`<div class="pill storm" title="Storm">⛈️<span class="bar"><i style="width:${Math.round(frac*100)}%"></i></span></div>`)}
+  else if(s.era===3)res.innerHTML=`<div class="pill">🪵 ${s.wood}</div><div class="pill">🪨 ${s.stone}</div>`;
+  else{const left=Math.max(0,s.stormAt-s.steps),frac=s.flood>0?1:Math.min(1,1-left/16);
+    res.innerHTML=`<div class="pill">${CLAY_SVG} ${s.clay}</div><div class="pill">🪵 ${s.wood}</div>`+(ringClosed()||s.won4?'':`<div class="pill storm" title="Storm">⛈️<span class="bar"><i style="width:${Math.round(frac*100)}%"></i></span></div>`)}
+  if(s.era===7)res.innerHTML=s.phase7==='flood'?`<div class="pill">🙋 ${s.saved}/${ROOFS7.length}</div>`:`<div class="pill">🧱 ${s.beton}</div>`+(s.phase7==='storm'&&!s.won?`<div class="pill storm">⛈️<span class="bar"><i style="width:${Math.round(Math.min(1,1-s.stormLeft/STORM7)*100)}%"></i></span></div>`:'');
+  if(s.era===6){const total=34,left=lakeLeft();res.innerHTML=`<div class="pill">${COAL_SVG} ${s.coal}</div><div class="pill storm" title="${t('lakeL')}">💧<span class="bar"><i style="width:${Math.round(left/total*100)}%;background:#7fb3cf"></i></span></div>`}
+  if(s.era===5)res.innerHTML=`<div class="pill">🪵 ${s.wood}</div><div class="pill">🌾 ${s.grain}</div><div class="pill">🪙 ${s.coin}</div>`;
+  $('eraT').textContent=s.era===1?'Drenthe':s.era===2?'Friesland':s.era===3?t('rhine'):s.era===4?'Holland':s.era===5?'Amsterdam':s.era===6?'Haarlemmermeer':t('zeelandL');$('eraY').textContent=t(s.yk);
+  const L=cardList();L.forEach(c=>{c.costs=c.costs||(c.cost?[[c.cost,c.res]]:[]);c.poor=c.costs.some(([n,r])=>s[r]<n)});
+  const sig=lang+L.map(c=>c.id+c.poor).join('|');
+  if(sig!==cardSig){cardSig=sig;const wrap=$('cards');wrap.innerHTML='';
+    for(const c of L){const b=document.createElement('button');b.className='card'+(c.poor?' poor':'');
+      const costHtml=c.costs.length?`<span class="cost">${c.costs.map(([n,r])=>n+' '+RES_ICON[r]).join(' + ')}</span>`:'';
+      b.innerHTML=`<span class="ic">${c.svg||c.ic}</span><span class="lbl">${c.label}${costHtml}</span>`;
+      b.onclick=()=>{initAudio();c.fn()};wrap.appendChild(b)}}
+  renderNote();
+}
+function renderNote(){
+  const n=$('note');n.hidden=!noteOpen;if(!noteOpen)return;let g;
+  if(s.era===1){if(!s.village)g=t('n1');else if(!s.tech.akker)g=t('n2');else if(!s.cows.length)g=t('n3');else if(!s.tech.hunebed)g=t('n4');else g=t('n5')}
+  else if(s.era===2)g=s.won2?t('n6done'):t('n6',s.flood>0,Math.max(0,s.stormAt-s.steps),s.lastWet);
+  else if(s.era===3)g=s.won3?t('n8done'):fortsDone()===0?t('n7'):t('n8',fortsDone(),count('road'),s.traded);
+  else if(s.era===7)g=s.won?t('n20'):s.phase7==='flood'?t('n17',s.saved):s.phase7==='storm'&&objAt(DAM7B)&&objAt(DAM7B).kind==='kering'&&s.gates==='open'?t('n19'):t('n18',closures7(),!!objAt(DAM7B));
+  else if(s.era===6)g=s.won6?t('n16'):t('n15',railsDone(),pumpsDone(),lakeLeft(),s.coal);
+  else if(s.era===5)g=s.won5?t('n14'):t('n13',housesDone(),stadDone(),s.saw,s.coin);
+  else if(s.era===4)g=s.won4?t('n12'):!ringClosed()?t('n9',dykesDone(),damDone()):!s.dry?t('n10'):t('n11');
+  n.innerHTML=`<h4>${t('forYou')} <span class="more">${noteMore?'▴':'▾'}</span></h4><p>${g[0]}</p>`+(noteMore?`<p>${g[1]}</p><p class="q">${t('ask')}: ${g[2]}</p>`:'');
+}
+
+// info card for the canoe: drawn to scale next to a 4-year-old (≈105 cm)
+function canoeSvg(){return `<svg class="scale" viewBox="0 0 380 150" role="img" aria-label="${t('canoeTitle')}">
+  <path d="M10 70 Q14 104 60 108 L262 108 Q304 104 308 70 Q300 82 262 84 L60 84 Q18 82 10 70Z" fill="#6b4423"/>
+  <path d="M10 70 Q18 82 60 84 L262 84 Q300 82 308 70 Q300 76 262 77 L60 77 Q18 76 10 70Z" fill="#3e2611"/>
+  <path d="M40 92 L280 92 M50 100 L270 100" stroke="#8a5a2b" stroke-width="2" stroke-linecap="round"/>
+  <line x1="10" y1="126" x2="308" y2="126" stroke="#a8693b" stroke-width="2.5"/><line x1="10" y1="119" x2="10" y2="133" stroke="#a8693b" stroke-width="2.5"/><line x1="308" y1="119" x2="308" y2="133" stroke="#a8693b" stroke-width="2.5"/>
+  <text x="159" y="146" text-anchor="middle" font-size="15" font-weight="700" fill="#6b4424">${t('svgLen')}</text>
+  <circle cx="346" cy="18" r="11" fill="#e5b48a"/><path d="M346 7 a11 11 0 0 1 11 9 l-22 0 a11 11 0 0 1 11 -9z" fill="#3a2614"/>
+  <rect x="334" y="30" width="24" height="42" rx="9" fill="#5d7a3f"/><rect x="336" y="70" width="8" height="38" rx="4" fill="#3d5a8a"/><rect x="348" y="70" width="8" height="38" rx="4" fill="#3d5a8a"/>
+  <text x="346" y="128" text-anchor="middle" font-size="15" font-weight="700" fill="#6b4424">${t('svgYou')}</text></svg>`}
+function showCanoe(){
+  s.said.canoeSeen=1;save();
+  overlay(()=>`<h2>${t('canoeTitle')}</h2><div class="yr">${t('canoeYr')}</div>${canoeSvg()}${t('canoeHtml')}<p><a class="ext" href="https://en.wikipedia.org/wiki/Pesse_canoe" target="_blank" rel="noopener">${t('canoeLink')}</a></p>`,
+    ()=>[{label:t('backMap'),fn:()=>{}}]);
+  say('canoeKid');
+}
+let noteMore=false;
+$('note').onclick=()=>{noteMore=!noteMore;renderNote()};
+$('bSay').onclick=()=>{initAudio();if(lastSay)say(lastSay[0],...lastSay[1])};
+$('bInfo').onclick=()=>{noteOpen=!noteOpen;try{localStorage.setItem(KEY+'-note',noteOpen?'1':'0')}catch(e){}renderNote()};
+function showMenu(){
+  overlay(()=>`<h2>${t('menu')}</h2>${voice||!('speechSynthesis' in window)?'':t('noVoice')}
+    <div class="vh">${t('voiceH')}</div>${voiceChips(STR[lang].tag,voice)}
+    <div class="vh">${t('letterLangH')}</div><div class="lng" role="group" aria-label="${t('letterLangH')}"><button data-ll="nl" aria-pressed="${letterLang==='nl'}">Nederlands</button><button data-ll="en" aria-pressed="${letterLang==='en'}">English</button></div>
+    ${letterTag()===STR[lang].tag?'':`<div class="vh">${t('voiceNL')}</div>${voiceChips(letterTag(),nlVoice)}`}
+    <p class="tip">${t('voiceTip')}</p>`,
+    ()=>[{label:t('cont'),fn:()=>{}},{label:t('abcBtn'),alt:1,fn:showBoard},{label:muted?t('soundOn'):t('soundOff'),alt:1,fn:()=>{muted=!muted;if(muted)try{speechSynthesis.cancel()}catch(e){}}},
+     {label:t('startOver'),alt:1,fn:()=>overlay(()=>`<h2>${t('really')}</h2>${t('lost')}`,()=>[{label:t('no'),fn:()=>{}},{label:t('yes'),alt:1,fn:()=>{s=newState();reveal(8,9,2);mode=null;target=null;cardSig='';save();intro1()}}])}],'menu');
+}
+$('bMenu').onclick=showMenu;
+
+function save(){try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){}}
+function float(x,y,txt,icon){parts.push({x:x+.5,y:y+.3,txt,icon,t0:performance.now()})}
+function burst(x,y){const cols=['#e8b44a','#c0573a','#f2e4c1','#5d7a3f','#5592aa'];for(let i=0;i<40;i++)confetti.push({x:x+.5,y:y+.5,vx:(Math.random()-.5)*.12,vy:-Math.random()*.14-.04,c:pick(cols),t0:performance.now()})}
+
+/* ---------- input ---------- */
+cv.addEventListener('pointerdown',e=>{
+  if(!s||!started||!$('ov').hidden||tr)return;initAudio();
+  const r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left-ox)/T),y=Math.floor((e.clientY-r.top-oy)/T);
+  if(mode&&mode.type==='build'){buildTap();return}
+  if(!inB(x,y))return;
+  if(mode&&mode.type==='field'){if(validField(x,y)){s.food-=3;s.obj[key(x,y)]={kind:'field'};s.tech.akker++;mode=null;sfx.get();burst(x,y);refresh();save();
+      if(s.tech.akker===1)letterThen('akker','A','akker','🌾',false,()=>say('fieldMade'));else say('fieldMore')}
+    else{sfx.no();say('fieldBad')}return}
+  if(mode&&mode.type==='hunebed'){if(validHune(x,y)){s.food-=6;s.obj[key(x,y)]={kind:'hunebed',p:0};mode={type:'build',k:key(x,y)};
+      say('huneStart');refresh();save()}
+    else{sfx.no();say('huneBad')}return}
+  if(s.era===1&&!anim&&x===s.unit.x&&y===s.unit.y&&onWater(x,y)){showCanoe();return}
+  tapMove(x,y);
+});
+document.addEventListener('gesturestart',e=>e.preventDefault());
+
+/* ---------- drawing (all drawing goes through dctx so icons can render on the tracing canvas) ---------- */
+function drawTerrain(x,y,now){
+  const c=dctx,tt=tile(x,y),px=ox+x*T,py=oy+y*T,h=hash(x,y);
+  c.fillStyle=COL[tt];c.fillRect(px,py,T+.5,T+.5);
+  c.fillStyle=h>.5?`rgba(255,255,255,${(h-.5)*.12})`:`rgba(0,0,0,${(.5-h)*.12})`;c.fillRect(px,py,T+.5,T+.5);
+  c.lineCap='round';
+  if(tt==='S'||tt==='R'||tt==='M'){c.strokeStyle='rgba(255,255,255,.25)';c.lineWidth=Math.max(1.5,T*.03);
+    for(let i=0;i<(tt!=='R'?2:1);i++){const wy=py+T*(tt!=='R'?.3+.4*i:.5),off=((now/1600+h+i*.5)%1)*T*.35;
+      c.beginPath();c.moveTo(px+T*.12+off,wy);c.quadraticCurveTo(px+T*.22+off,wy-T*.07,px+T*.32+off,wy);c.stroke()}}
+  else if(tt==='K'){c.strokeStyle='#6c8159';c.lineWidth=Math.max(1.5,T*.025);
+    for(let i=0;i<3;i++){const a=px+T*(.15+.7*rnd(x,y,i)),b=py+T*(.2+.6*rnd(x,y,i+5));c.beginPath();c.moveTo(a-T*.05,b-T*.07);c.lineTo(a,b);c.lineTo(a+T*.05,b-T*.07);c.stroke()}}
+  else if(tt==='V'){for(let i=0;i<2;i++){c.fillStyle='rgba(70,100,110,.75)';c.beginPath();c.ellipse(px+T*(.25+.5*rnd(x,y,i)),py+T*(.25+.5*rnd(x,y,i+3)),T*.15,T*.07,0,0,7);c.fill()}
+    c.strokeStyle='#4a4630';c.lineWidth=Math.max(1.5,T*.025);for(let i=0;i<3;i++){const a=px+T*(.1+.8*rnd(x,y,i+7)),b=py+T*(.3+.6*rnd(x,y,i+9));c.beginPath();c.moveTo(a,b);c.lineTo(a+T*.02,b-T*.16);c.stroke()}}
+  else if(tt==='L'){c.strokeStyle='#87a052';c.lineWidth=Math.max(1.5,T*.025);for(let i=0;i<4;i++){const a=px+T*(.1+.8*rnd(x,y,i)),b=py+T*(.15+.75*rnd(x,y,i+4));c.beginPath();c.moveTo(a,b);c.lineTo(a+T*.03,b-T*.08);c.stroke()}}
+  else if(tt==='Q'){c.strokeStyle='rgba(90,70,50,.28)';c.lineWidth=1;for(let r=1;r<4;r++){const yy=py+T*r/4;c.beginPath();c.moveTo(px,yy);c.lineTo(px+T,yy);c.stroke();
+      for(let q=0;q<3;q++){const xx=px+T*((q+(r%2)*.5)/3);c.beginPath();c.moveTo(xx,yy-T/4);c.lineTo(xx,yy);c.stroke()}}}
+  else if(tt==='H'){c.fillStyle='#c4a866';for(let i=0;i<6;i++){c.beginPath();c.arc(px+T*(.1+.8*rnd(x,y,i)),py+T*(.1+.8*rnd(x,y,i+6)),T*.025,0,7);c.fill()}}
+  else if(tt==='B'){for(let i=0;i<3;i++){const a=px+T*(.22+.56*rnd(x,y,i)),b=py+T*(.22+.56*rnd(x,y,i+3));
+    c.fillStyle='#3d6533';c.beginPath();c.arc(a,b,T*.15,0,7);c.fill();c.fillStyle='#689852';c.beginPath();c.arc(a-T*.04,b-T*.04,T*.06,0,7);c.fill()}}
+}
+function drawHut(cx,cy){
+  const c=dctx;c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.ellipse(cx,cy+T*.24,T*.3,T*.07,0,0,7);c.fill();
+  c.fillStyle='#7a5530';c.fillRect(cx-T*.22,cy,T*.44,T*.22);
+  c.fillStyle='#c09a54';c.beginPath();c.moveTo(cx-T*.31,cy+T*.02);c.lineTo(cx,cy-T*.32);c.lineTo(cx+T*.31,cy+T*.02);c.closePath();c.fill();
+  c.strokeStyle='#8f6e35';c.lineWidth=Math.max(1,T*.02);for(let i=-2;i<=2;i++){c.beginPath();c.moveTo(cx,cy-T*.3);c.lineTo(cx+i*T*.12,cy);c.stroke()}
+  c.fillStyle='#3a2614';c.fillRect(cx-T*.05,cy+T*.08,T*.1,T*.14);
+}
+function drawField(px,py){
+  const c=dctx,i=T*.1;c.fillStyle='#c9a646';c.beginPath();c.roundRect(px+i,py+i,T-2*i,T-2*i,T*.08);c.fill();
+  c.strokeStyle='#97762a';c.lineWidth=Math.max(1.5,T*.03);for(let r=1;r<=4;r++){const y=py+i+(T-2*i)*r/5;c.beginPath();c.moveTo(px+i*1.6,y);c.lineTo(px+T-i*1.6,y);c.stroke()}
+}
+function stone(x,y,w,h){const c=dctx;c.fillStyle='#8d8f8a';c.strokeStyle='#5f615c';c.lineWidth=Math.max(1.5,T*.02);c.beginPath();c.roundRect(x,y,w,h,w*.4);c.fill();c.stroke()}
+function drawHunebed(cx,cy,p){
+  const c=dctx,base=cy+T*.25;c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.ellipse(cx,base,T*.36,T*.07,0,0,7);c.fill();
+  const xs=[-.27,-.09,.09,.27];
+  for(let i=0;i<4;i++){if(i<p)stone(cx+xs[i]*T-T*.06,base-T*.22,T*.12,T*.22);
+    else{c.setLineDash([3,3]);c.strokeStyle='rgba(60,50,30,.5)';c.lineWidth=1.5;c.strokeRect(cx+xs[i]*T-T*.06,base-T*.22,T*.12,T*.22);c.setLineDash([])}}
+  if(p>=5){c.fillStyle='#a2a49e';c.strokeStyle='#5f615c';c.beginPath();c.ellipse(cx,base-T*.25,T*.38,T*.09,0,0,7);c.fill();c.stroke()}
+}
+function drawFarm(cx,cy,o,now){
+  const c=dctx,mh=(o.terp/TERP_MAX)*T*.3,gy=cy+T*.36;
+  if(o.terp>0){c.fillStyle='#6f8550';c.strokeStyle='#4e5f38';c.lineWidth=Math.max(1.5,T*.025);c.beginPath();c.ellipse(cx,gy,T*.48,mh+T*.02,0,Math.PI,2*Math.PI);c.closePath();c.fill();c.stroke()}
+  if(!o.house)return;const by=gy-mh;
+  c.fillStyle=o.wet?'#6a6a68':'#7d5a37';c.fillRect(cx-T*.28,by-T*.15,T*.56,T*.15);
+  c.fillStyle=o.wet?'#8d8a7c':'#c49b57';c.beginPath();c.moveTo(cx-T*.33,by-T*.14);c.lineTo(cx-T*.2,by-T*.34);c.lineTo(cx+T*.2,by-T*.34);c.lineTo(cx+T*.33,by-T*.14);c.closePath();c.fill();
+  c.fillStyle='#3a2614';c.fillRect(cx-T*.04,by-T*.11,T*.08,T*.11);
+  if(o.wet){c.fillStyle='#7fb3cf';for(let i=0;i<3;i++){const dy=((now/600+i/3)%1)*T*.2;c.beginPath();c.arc(cx+(i-1)*T*.18,by-T*.1+dy,T*.025,0,7);c.fill()}}
+}
+function drawFort(cx,cy,p){
+  const c=dctx,w=T*.78,d=T*.62,x0=cx-w/2,y0=cy-d/2+T*.05,h=(Math.min(p,5)/5)*T*.2;
+  c.fillStyle='#8c7b52';c.fillRect(x0,y0,w,d);
+  c.strokeStyle='#6b5a3a';c.lineWidth=Math.max(1,T*.02);c.strokeRect(x0+T*.05,y0+T*.05,w-T*.1,d-T*.1);
+  if(p>0){c.strokeStyle='#8a5a2b';c.lineWidth=Math.max(2,T*.05);c.strokeRect(x0,y0-h*.6,w,d);
+    c.fillStyle='#8a5a2b';c.fillRect(x0,y0+d-h,w,h);c.strokeStyle='#5a3a1c';c.lineWidth=1;
+    for(let i=1;i<10;i++){const xx=x0+w*i/10;c.beginPath();c.moveTo(xx,y0+d-h);c.lineTo(xx,y0+d);c.stroke()}}
+  if(p>=5){c.fillStyle='#2a1a0c';c.fillRect(cx-T*.07,y0+d-h,T*.14,h);
+    for(const [tx,ty] of [[x0,y0],[x0+w,y0],[x0,y0+d],[x0+w,y0+d]]){c.fillStyle='#6b4423';c.fillRect(tx-T*.07,ty-T*.2,T*.14,T*.2);c.fillStyle='#b5322a';c.beginPath();c.moveTo(tx-T*.09,ty-T*.2);c.lineTo(tx,ty-T*.3);c.lineTo(tx+T*.09,ty-T*.2);c.closePath();c.fill()}
+    c.strokeStyle='#4a3018';c.lineWidth=Math.max(1.5,T*.02);c.beginPath();c.moveTo(cx,y0+T*.15);c.lineTo(cx,y0-T*.25);c.stroke();c.fillStyle='#b5322a';c.fillRect(cx,y0-T*.25,T*.16,T*.1)}
+}
+function drawRoad(px,py,x,y){
+  const c=dctx,cx=px+T/2,cy=py+T/2,r=T*.17;c.fillStyle='#c2b391';c.fillRect(cx-r,cy-r,r*2,r*2);
+  for(const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]){const o=s.obj[key(x+a,y+b)];if(o&&(o.kind==='road'||o.kind==='fort')){
+    if(a)c.fillRect(a>0?cx:px,cy-r,T/2,r*2);else c.fillRect(cx-r,b>0?cy:py,r*2,T/2)}}
+  c.fillStyle='#9a8b6a';for(let i=0;i<5;i++){c.beginPath();c.arc(cx+(rnd(x,y,i)-.5)*r*1.6,cy+(rnd(x,y,i+5)-.5)*r*1.6,T*.015,0,7);c.fill()}
+}
+function drawDyke(px,py,p){
+  const c=dctx,k=Math.min(p,4)/4,top=py+T*(.62-.38*k),bot=py+T*.86;
+  c.fillStyle='#5f7a44';c.beginPath();c.moveTo(px,bot);c.lineTo(px+T*.08,top);c.lineTo(px+T*.92,top);c.lineTo(px+T,bot);c.closePath();c.fill();
+  c.fillStyle='#7f9a58';c.fillRect(px+T*.08,top,T*.84,Math.max(2,T*.07));
+  if(p>=4){c.fillStyle='#d8cdb0';c.fillRect(px,top+T*.02,T,T*.03);c.fillStyle='#f4f1ea';c.beginPath();c.ellipse(px+T*.7,top-T*.05,T*.07,T*.045,0,0,7);c.fill()}
+}
+function drawDam(px,py,p){
+  const c=dctx,k=Math.min(p,4)/4;
+  c.fillStyle='#8a6a45';c.fillRect(px,py+T*.3,T,T*.4*k+2);
+  c.strokeStyle='#5a3a1c';c.lineWidth=Math.max(1,T*.02);for(let i=1;i<6;i++){const xx=px+T*i/6;c.beginPath();c.moveTo(xx,py+T*.3);c.lineTo(xx,py+T*.3+T*.4*k);c.stroke()}
+  if(p>=4){c.fillStyle='#9a5d32';c.fillRect(px,py+T*.25,T,T*.08);c.fillStyle='#c2b391';c.fillRect(px,py+T*.42,T,T*.14)}
+}
+function drawMill(cx,cy,p,now){
+  const c=dctx,k=Math.min(p,5)/5,base=cy+T*.38,h=T*.62*k;
+  c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.ellipse(cx,base,T*.26,T*.06,0,0,7);c.fill();
+  c.fillStyle='#6b5a48';c.beginPath();c.moveTo(cx-T*.2,base);c.lineTo(cx-T*.12,base-h);c.lineTo(cx+T*.12,base-h);c.lineTo(cx+T*.2,base);c.closePath();c.fill();
+  if(p<5)return;
+  const hy=base-h;c.fillStyle='#4a3a2c';c.beginPath();c.moveTo(cx-T*.15,hy);c.lineTo(cx,hy-T*.14);c.lineTo(cx+T*.15,hy);c.closePath();c.fill();
+  c.fillStyle='#2a1a0c';c.fillRect(cx-T*.04,base-T*.14,T*.08,T*.14);
+  const ang=now/700;c.save();c.translate(cx,hy-T*.02);c.rotate(ang);
+  for(let i=0;i<4;i++){c.rotate(Math.PI/2);c.fillStyle='#e9dfc6';c.fillRect(T*.03,-T*.04,T*.38,T*.08);c.strokeStyle='#5a3a1c';c.lineWidth=1;c.strokeRect(T*.03,-T*.04,T*.38,T*.08)}
+  c.fillStyle='#3a2614';c.beginPath();c.arc(0,0,T*.04,0,7);c.fill();c.restore();
+}
+function gable(x,base,w,h,col){const c=dctx;c.fillStyle=col;c.beginPath();c.moveTo(x,base);c.lineTo(x,base-h);c.lineTo(x+w*.2,base-h);c.lineTo(x+w*.2,base-h-T*.05);c.lineTo(x+w*.5,base-h-T*.14);c.lineTo(x+w*.8,base-h-T*.05);c.lineTo(x+w*.8,base-h);c.lineTo(x+w,base-h);c.lineTo(x+w,base);c.closePath();c.fill();
+  c.fillStyle='#f0e2b8';c.fillRect(x+w*.3,base-h*.75,w*.15,h*.2);c.fillRect(x+w*.55,base-h*.75,w*.15,h*.2);c.fillStyle='#3a2614';c.fillRect(x+w*.38,base-h*.35,w*.24,h*.35)}
+function drawCity(cx,cy){const base=cy+T*.36,w=T*.27;gable(cx-T*.42,base,w,T*.42,'#8e3b2a');gable(cx-T*.14,base,w,T*.52,'#a5583a');gable(cx+T*.14,base,w,T*.38,'#6e4a3a')}
+function drawHanze(cx,cy){drawCity(cx,cy+T*.04);const c=dctx;c.fillStyle='#7a7468';c.fillRect(cx+T*.3,cy-T*.42,T*.12,T*.78);c.fillStyle='#4a3a2c';c.beginPath();c.moveTo(cx+T*.28,cy-T*.42);c.lineTo(cx+T*.36,cy-T*.62);c.lineTo(cx+T*.44,cy-T*.42);c.closePath();c.fill()}
+function drawGrachtHouse(cx,cy,p,x,y){
+  const c=dctx,base=cy+T*.38,cols=['#7a2e22','#3c3a36','#8e5a3a','#5b2a2a','#6a4a32'],col=cols[Math.floor(hash(x,y)*cols.length)];
+  // piles first (taps 1-3), then the house rises (taps 4-6)
+  const piles=Math.min(p,3);c.fillStyle='#6b4423';for(let i=0;i<3;i++){const ph=i<piles?T*.12:T*.3;c.fillRect(cx-T*.2+i*T*.17,base-ph,T*.05,ph)}
+  if(p<=3){if(p<3){c.fillStyle='#4a3018';c.fillRect(cx-T*.25+piles*T*.17,base-T*.42,T*.15,T*.06)}return}
+  const k=(Math.min(p,6)-3)/3,w=T*.42,h=T*.62*k;gable(cx-w/2,base,w,h,col);
+  if(p>=6){c.fillStyle='#e9dfc6';c.fillRect(cx-w*.08,base-h-T*.13,w*.16,T*.03)}
+}
+function drawStadhuis(cx,cy,p){
+  const c=dctx,base=cy+T*.42,k=Math.min(p,10)/10,w=T*1.5,h=T*.62*k;
+  c.fillStyle='#6b4423';for(let i=0;i<9;i++)c.fillRect(cx-w/2+i*w/8.5,base-T*.06,T*.04,T*.1);
+  if(p<1)return;
+  c.fillStyle='#d9ccb0';c.fillRect(cx-w/2,base-h,w,h);
+  c.fillStyle='#8a7d66';for(let r=0;r<2;r++)for(let i=0;i<7;i++)if(h>T*(.2+r*.25))c.fillRect(cx-w/2+T*.08+i*w/7.2,base-h+T*.1+r*T*.22,T*.1,T*.13);
+  if(p>=10){c.fillStyle='#b9ab8f';c.beginPath();c.moveTo(cx-w*.2,base-h);c.lineTo(cx,base-h-T*.18);c.lineTo(cx+w*.2,base-h);c.closePath();c.fill();
+    c.fillStyle='#d9ccb0';c.fillRect(cx-T*.08,base-h-T*.42,T*.16,T*.26);c.fillStyle='#5f6f6a';c.beginPath();c.arc(cx,base-h-T*.42,T*.1,Math.PI,0);c.fill();
+    c.fillStyle='#d4a72c';c.beginPath();c.arc(cx,base-h-T*.54,T*.035,0,7);c.fill()}
+}
+function drawPakhuis(cx,cy){
+  const c=dctx,base=cy+T*.38,w=T*.7,h=T*.55;c.fillStyle='#6e3a26';c.beginPath();c.moveTo(cx-w/2,base);c.lineTo(cx-w/2,base-h);c.lineTo(cx,base-h-T*.18);c.lineTo(cx+w/2,base-h);c.lineTo(cx+w/2,base);c.closePath();c.fill();
+  c.fillStyle='#2f4a2e';for(let r=0;r<3;r++)c.fillRect(cx-T*.07,base-h+T*.06+r*T*.17,T*.14,T*.12);
+  if(s&&s.grain>0)emoji('🌾',cx+T*.3,cy-T*.3,T*.26);
+}
+function drawPort(cx,cy,res){
+  const c=dctx;c.fillStyle=res==='wood'?'#4d6a45':'#b9a46a';c.beginPath();c.ellipse(cx,cy+T*.12,T*.46,T*.24,0,0,7);c.fill();
+  if(res==='wood'){for(const [dx,dy] of [[-.2,0],[.05,-.06],[.25,.02]]){c.fillStyle='#2f4a2e';c.beginPath();c.moveTo(cx+dx*T,cy+(dy-.32)*T);c.lineTo(cx+(dx-.1)*T,cy+(dy+.08)*T);c.lineTo(cx+(dx+.1)*T,cy+(dy+.08)*T);c.closePath();c.fill()}}
+  else emoji('🌾',cx,cy-T*.04,T*.38);
+  if(s&&portReady(res)){c.strokeStyle='rgba(232,180,74,.85)';c.lineWidth=3;c.beginPath();c.arc(cx,cy,T*.48,0,7);c.stroke()}
+}
+function drawRail(px,py,p){
+  const c=dctx,cy=py+T*.55;c.fillStyle='#6b4423';for(let i=0;i<4;i++)c.fillRect(px+T*(.08+i*.24),cy-T*.14,T*.08,T*.28);
+  if(p>=1){c.fillStyle='#5f6368';c.fillRect(px,cy-T*.1,T,T*.04);if(p>=2)c.fillRect(px,cy+T*.06,T,T*.04)}
+}
+function drawGemaal(cx,cy,p,fuel,now){
+  const c=dctx,base=cy+T*.38,k=Math.min(p,6)/6,w=T*.62,h=T*.42*k;
+  c.fillStyle='#8e3b2a';c.fillRect(cx-w/2,base-h,w,h);if(p<6)return;
+  c.fillStyle='#6e2c20';c.beginPath();c.moveTo(cx-w/2-T*.03,base-h);c.lineTo(cx,base-h-T*.16);c.lineTo(cx+w/2+T*.03,base-h);c.closePath();c.fill();
+  c.fillStyle='#e9dfc6';for(let i=0;i<3;i++){c.beginPath();c.arc(cx-w*.3+i*w*.3,base-h*.55,T*.05,Math.PI,0);c.fill();c.fillRect(cx-w*.3+i*w*.3-T*.05,base-h*.55,T*.1,T*.08)}
+  c.fillStyle='#5a2a20';c.fillRect(cx+w*.28,base-h-T*.42,T*.08,T*.34);
+  if(fuel>0)for(let i=0;i<3;i++){const ph=((now/1400)+i/3)%1;c.fillStyle=`rgba(220,220,215,${.7-ph*.6})`;c.beginPath();c.arc(cx+w*.32+ph*T*.25,base-h-T*.44-ph*T*.4,T*(.05+ph*.08),0,7);c.fill()}
+}
+function drawHaven(cx,cy){
+  const c=dctx;c.fillStyle='#6b4423';c.fillRect(cx-T*.48,cy+T*.08,T*.6,T*.1);for(let i=0;i<3;i++)c.fillRect(cx-T*.44+i*T*.22,cy+T*.08,T*.05,T*.3);
+  c.fillStyle='#1c1c1c';c.beginPath();c.moveTo(cx-T*.42,cy+T*.08);c.quadraticCurveTo(cx-T*.25,cy-T*.22,cx-T*.06,cy+T*.08);c.closePath();c.fill();
+  if(s&&portReady('haven')){c.strokeStyle='rgba(232,180,74,.85)';c.lineWidth=3;c.beginPath();c.arc(cx,cy,T*.48,0,7);c.stroke()}
+}
+function drawTrain(cx,cy,now){
+  const c=dctx,y=cy+T*.12;
+  // carriage
+  c.fillStyle='#c9a646';c.fillRect(cx+T*.18,y-T*.22,T*.34,T*.2);c.fillStyle='#e9dfc6';c.fillRect(cx+T*.22,y-T*.18,T*.1,T*.08);c.fillRect(cx+T*.38,y-T*.18,T*.1,T*.08);
+  // locomotive: tall chimney, green boiler
+  c.fillStyle='#2f5a3a';c.fillRect(cx-T*.42,y-T*.2,T*.42,T*.16);c.fillStyle='#1c1c1c';c.fillRect(cx-T*.08,y-T*.32,T*.14,T*.28);
+  c.fillRect(cx-T*.36,y-T*.42,T*.07,T*.22);c.beginPath();c.moveTo(cx-T*.4,y-T*.42);c.lineTo(cx-T*.25,y-T*.42);c.lineTo(cx-T*.28,y-T*.38);c.lineTo(cx-T*.37,y-T*.38);c.fill();
+  c.fillStyle='#b5322a';for(const wx of [-.32,-.14,.26,.44]){c.beginPath();c.arc(cx+wx*T,y,T*.06,0,7);c.fill()}
+  for(let i=0;i<3;i++){const ph=((now/900)+i/3)%1;c.fillStyle=`rgba(235,235,230,${.75-ph*.7})`;c.beginPath();c.arc(cx-T*.33-ph*T*.3,y-T*.5-ph*T*.25,T*(.04+ph*.07),0,7);c.fill()}
+}
+function drawHeli(cx,cy,now){
+  const c=dctx,y=cy-T*.08+Math.sin(now/300)*T*.03;
+  c.fillStyle='rgba(0,0,0,.18)';c.beginPath();c.ellipse(cx,cy+T*.32,T*.3,T*.06,0,0,7);c.fill();
+  c.fillStyle='#3d5a3a';c.fillRect(cx+T*.05,y-T*.04,T*.38,T*.07);c.fillRect(cx+T*.38,y-T*.13,T*.05,T*.14);
+  c.beginPath();c.ellipse(cx-T*.05,y,T*.24,T*.15,0,0,7);c.fill();
+  c.fillStyle='#bfe0ef';c.beginPath();c.ellipse(cx-T*.17,y-T*.03,T*.09,T*.08,0,0,7);c.fill();
+  c.fillStyle='#e8e2d0';c.fillRect(cx-T*.08,y-T*.04,T*.1,T*.05);
+  c.strokeStyle='#2a2a2a';c.lineWidth=Math.max(1.5,T*.025);c.beginPath();c.moveTo(cx-T*.25,y+T*.2);c.lineTo(cx+T*.12,y+T*.2);c.moveTo(cx-T*.15,y+T*.13);c.lineTo(cx-T*.17,y+T*.2);c.moveTo(cx+.02*T,y+T*.13);c.lineTo(cx+T*.04,y+T*.2);c.stroke();
+  c.fillStyle='#2a2a2a';c.fillRect(cx-T*.07,y-T*.2,T*.05,T*.06);
+  const a=(now/60)%Math.PI,len=T*.45*Math.abs(Math.cos(a))+T*.08;c.strokeStyle='rgba(30,30,30,.75)';c.lineWidth=Math.max(2,T*.03);c.beginPath();c.moveTo(cx-T*.05-len,y-T*.2);c.lineTo(cx-T*.05+len,y-T*.2);c.stroke();
+  c.beginPath();c.arc(cx+T*.42,y-T*.08,T*.06,0,7);c.strokeStyle='rgba(30,30,30,.5)';c.lineWidth=1.5;c.stroke();
+}
+function drawRoof(cx,cy,o,now){
+  const c=dctx,base=cy+T*.25;
+  c.fillStyle='#7d5a37';c.fillRect(cx-T*.28,base-T*.1,T*.56,T*.1);
+  c.fillStyle='#8e3b2a';c.beginPath();c.moveTo(cx-T*.34,base-T*.08);c.lineTo(cx,base-T*.38);c.lineTo(cx+T*.34,base-T*.08);c.closePath();c.fill();
+  if(!o.saved){const wave=Math.sin(now/180)*.5;drawPerson(cx+T*.05,base-T*.42,.85,'#c0573a');
+    c.strokeStyle='#e5b48a';c.lineWidth=Math.max(2,T*.03);c.beginPath();c.moveTo(cx+T*.1,base-T*.5);c.lineTo(cx+T*(.22+wave*.06),base-T*.68);c.stroke();
+    c.strokeStyle='rgba(232,180,74,.9)';c.lineWidth=3;c.beginPath();c.arc(cx,cy,T*(.46+.04*Math.sin(now/250)),0,7);c.stroke()}
+}
+function drawFactory(cx,cy){
+  const c=dctx,base=cy+T*.35;c.fillStyle='#8d8f8a';c.fillRect(cx-T*.36,base-T*.36,T*.5,T*.36);c.fillStyle='#6f716c';c.fillRect(cx+T*.14,base-T*.55,T*.12,T*.55);
+  c.fillStyle='#b8b9b4';for(let i=0;i<3;i++)for(let j=0;j<2-i%2;j++)c.fillRect(cx-T*.42+j*T*.15+(i%2)*T*.07,base-T*.1-i*T*.1+T*.08,T*.13,T*.09);
+  if(s&&portReady('factory')&&s.phase7!=='flood'){c.strokeStyle='rgba(232,180,74,.85)';c.lineWidth=3;c.beginPath();c.arc(cx,cy,T*.48,0,7);c.stroke()}
+}
+function drawDam7(px,py,p){
+  const c=dctx,k=Math.min(p,5)/5;c.fillStyle='#a9aba6';
+  for(let i=0;i<Math.ceil(10*k);i++){const r=Math.floor(i/5),q=i%5;c.fillRect(px+q*T*.2+(r%2)*T*.1-T*.02,py+T*(.62-r*.16),T*.19,T*.15)}
+  if(p>=5){c.fillStyle='#7f9a58';c.fillRect(px,py+T*.18,T,T*.12)}
+}
+function drawKering(px,py,p,gates,now){
+  const c=dctx,k=Math.min(p,8)/8,n=Math.max(1,Math.ceil(4*k));
+  for(let i=0;i<n;i++){const x=px+T*(.06+i*.29);c.fillStyle='#c9c6bc';c.fillRect(x,py+T*.12,T*.08,T*.78);c.fillStyle='#8d8f8a';c.fillRect(x-T*.02,py+T*.08,T*.12,T*.06)}
+  if(p>=8){c.fillStyle='#8d8f8a';c.fillRect(px,py+T*.08,T,T*.06);
+    for(let i=0;i<3;i++){const x=px+T*(.14+i*.29),gy=gates==='closed'?py+T*.42:py+T*.16;c.fillStyle='#e0731f';c.fillRect(x,gy,T*.21,T*.22)}}
+}
+function drawPerson(x,y,sc,tunic){
+  const c=dctx;c.fillStyle=tunic;c.beginPath();c.ellipse(x,y,T*.075*sc,T*.11*sc,0,0,7);c.fill();
+  c.fillStyle='#e5b48a';c.beginPath();c.arc(x,y-T*.15*sc,T*.065*sc,0,7);c.fill();
+  c.fillStyle='#3a2614';c.beginPath();c.arc(x,y-T*.17*sc,T*.065*sc,Math.PI,2*Math.PI);c.fill();
+}
+function drawBoat(cx,cy,now,kind){
+  const c=dctx;kind=kind||s.era;const bob=Math.sin(now/320)*T*.02;cy+=bob;
+  if(kind===6){ // paddle steamer with funnel
+    const w=T*.9,h=T*.18;
+    c.strokeStyle='rgba(255,255,255,.4)';c.lineWidth=2;c.beginPath();c.ellipse(cx,cy+h*.8,w*.6,h*.4,0,0,7);c.stroke();
+    c.fillStyle='#1c1c1c';c.fillRect(cx-T*.06,cy-T*.55,T*.11,T*.42);c.fillStyle='#b5322a';c.fillRect(cx-T*.06,cy-T*.55,T*.11,T*.06);
+    for(let i=0;i<3;i++){const ph=((now/1000)+i/3)%1;c.fillStyle=`rgba(225,225,220,${.75-ph*.7})`;c.beginPath();c.arc(cx-ph*T*.3,cy-T*.62-ph*T*.25,T*(.05+ph*.07),0,7);c.fill()}
+    c.fillStyle='#e9dfc6';c.fillRect(cx-w*.32,cy-h*1.4,w*.5,h*.9);
+    c.fillStyle='#2c2c2c';c.beginPath();c.moveTo(cx-w/2,cy-h*.5);c.lineTo(cx+w/2,cy-h*.5);c.lineTo(cx+w*.42,cy+h*.8);c.lineTo(cx-w*.42,cy+h*.8);c.closePath();c.fill();
+    c.fillStyle='#b5322a';c.beginPath();c.arc(cx+w*.05,cy-h*.2,T*.17,Math.PI,0);c.fill();c.strokeStyle='#5a1a14';c.lineWidth=1.5;for(let i=0;i<5;i++){const a=Math.PI+i*Math.PI/4;c.beginPath();c.moveTo(cx+w*.05,cy-h*.2);c.lineTo(cx+w*.05+Math.cos(a)*T*.17,cy-h*.2+Math.sin(a)*T*.17);c.stroke()}
+    if(kind===s.era&&s.coal>0){c.fillStyle='#1c1c1c';c.beginPath();c.arc(cx+w*.32,cy-h*.55,T*.07,Math.PI,0);c.fill()}
+    return;
+  }
+  if(kind===5){ // fluyt: long narrow hull, rounded pear-shaped stern, three masts, Prince's flag
+    const w=T*1,h=T*.18;
+    c.strokeStyle='rgba(255,255,255,.4)';c.lineWidth=2;c.beginPath();c.ellipse(cx,cy+h*.9,w*.62,h*.45,0,0,7);c.stroke();
+    for(const [mx,mh,sw] of [[-.22,.62,.2],[.05,.78,.25],[.3,.55,.16]]){c.strokeStyle='#4a3018';c.lineWidth=Math.max(1.5,T*.025);c.beginPath();c.moveTo(cx+mx*w,cy-h*.3);c.lineTo(cx+mx*w,cy-mh*T);c.stroke();
+      c.fillStyle='#f1e9d4';c.fillRect(cx+mx*w-sw*T/2,cy-mh*T+T*.06,sw*T,T*.16);if(mh>.6)c.fillRect(cx+mx*w-sw*T*.4,cy-mh*T*.62,sw*T*.8,T*.13)}
+    const fx=cx-.22*w,fy=cy-.62*T;[['#e0731f',0],['#fff',1],['#2b4a8a',2]].forEach(([cl,i])=>{c.fillStyle=cl;c.fillRect(fx,fy-T*.1+i*T*.033,T*.13,T*.034)});
+    c.fillStyle='#5a3a1c';c.beginPath();c.moveTo(cx-w/2,cy-h*1.4);c.quadraticCurveTo(cx-w*.48,cy+h*.9,cx-w*.2,cy+h*.9);c.lineTo(cx+w*.36,cy+h*.9);c.quadraticCurveTo(cx+w*.5,cy+h*.4,cx+w/2,cy-h*.5);c.lineTo(cx-w*.35,cy-h*.5);c.quadraticCurveTo(cx-w*.42,cy-h*1.2,cx-w/2,cy-h*1.4);c.fill();
+    c.strokeStyle='#d4a72c';c.lineWidth=Math.max(1,T*.015);c.beginPath();c.moveTo(cx-w*.42,cy);c.lineTo(cx+w*.45,cy);c.stroke();
+    if(kind===s.era&&(s.wood||s.grain)){c.fillStyle=s.grain?'#d9b44a':'#8a5a2b';c.fillRect(cx-w*.1,cy-h*.95,T*.18,T*.1)}
+    return;
+  }
+  if(kind===4){ // cog: deep round hull, castles fore and aft, one square sail
+    const w=T*.9,h=T*.26;
+    c.strokeStyle='rgba(255,255,255,.4)';c.lineWidth=2;c.beginPath();c.ellipse(cx,cy+h*.75,w*.6,h*.35,0,0,7);c.stroke();
+    c.strokeStyle='#4a3018';c.lineWidth=Math.max(2,T*.035);c.beginPath();c.moveTo(cx,cy-h*.3);c.lineTo(cx,cy-T*.78);c.stroke();
+    c.fillStyle='#efe3c4';c.beginPath();c.moveTo(cx-T*.26,cy-T*.72);c.quadraticCurveTo(cx,cy-T*.66,cx+T*.26,cy-T*.72);c.lineTo(cx+T*.28,cy-T*.3);c.quadraticCurveTo(cx,cy-T*.22,cx-T*.28,cy-T*.3);c.closePath();c.fill();
+    c.fillStyle='#b5322a';c.fillRect(cx-T*.03,cy-T*.7,T*.06,T*.42);c.fillRect(cx-T*.26,cy-T*.53,T*.52,T*.06);
+    c.fillStyle='#5a3a1c';c.fillRect(cx+w*.28,cy-h*.75,w*.2,h*.45);c.fillRect(cx-w*.5,cy-h*.6,w*.16,h*.3);
+    drawPerson(cx+w*.36,cy-h*.8,.85,'#3d5a8a');
+    c.fillStyle='#6b4423';c.beginPath();c.moveTo(cx-w/2,cy-h*.4);c.lineTo(cx+w/2,cy-h*.4);c.quadraticCurveTo(cx+w*.45,cy+h*.75,cx,cy+h*.75);c.quadraticCurveTo(cx-w*.45,cy+h*.75,cx-w/2,cy-h*.4);c.fill();
+    c.strokeStyle='#4a3018';c.lineWidth=Math.max(1,T*.02);for(let i=1;i<3;i++){c.beginPath();c.moveTo(cx-w*.48,cy-h*.4+h*.35*i);c.quadraticCurveTo(cx,cy-h*.25+h*.38*i,cx+w*.48,cy-h*.4+h*.35*i);c.stroke()}
+    return;
+  }
+  if(kind===3){ // flat-bottomed Roman barge with a sail and steering oar
+    const w=T*.98,h=T*.16;
+    c.strokeStyle='rgba(255,255,255,.4)';c.lineWidth=2;c.beginPath();c.ellipse(cx,cy+h*.9,w*.6,h*.5,0,0,7);c.stroke();
+    c.strokeStyle='#4a3018';c.lineWidth=Math.max(2,T*.03);c.beginPath();c.moveTo(cx-w*.05,cy-h*.2);c.lineTo(cx-w*.05,cy-T*.62);c.stroke();
+    c.fillStyle='#efe3c4';c.beginPath();c.moveTo(cx-w*.05-T*.22,cy-T*.58);c.lineTo(cx-w*.05+T*.22,cy-T*.58);c.lineTo(cx-w*.05+T*.2,cy-T*.25);c.lineTo(cx-w*.05-T*.2,cy-T*.25);c.closePath();c.fill();
+    c.fillStyle='#b5322a';c.fillRect(cx-w*.05-T*.21,cy-T*.45,T*.42,T*.05);
+    if(kind===s.era&&(s.wood||s.stone)){c.fillStyle='#8a5a2b';c.fillRect(cx+w*.12,cy-h*.9,T*.14,T*.1);c.fillStyle='#8d8f8a';c.fillRect(cx+w*.28,cy-h*.85,T*.1,T*.09)}
+    drawPerson(cx-w*.3,cy-h*.6,1,'#9b2d20');
+    c.strokeStyle='#4a3018';c.lineWidth=Math.max(2,T*.03);c.beginPath();c.moveTo(cx-w*.42,cy-h*.6);c.lineTo(cx-w*.58,cy+h*.9);c.stroke();
+    c.fillStyle='#5a4632';c.beginPath();c.moveTo(cx-w/2,cy-h*.5);c.lineTo(cx+w/2,cy-h*.5);c.lineTo(cx+w*.44,cy+h*.6);c.lineTo(cx-w*.44,cy+h*.6);c.closePath();c.fill();
+    c.strokeStyle='#8a7050';c.lineWidth=Math.max(1.5,T*.025);c.beginPath();c.moveTo(cx-w/2,cy-h*.5);c.lineTo(cx+w/2,cy-h*.5);c.stroke();
+    return;
+  }
+  const big=kind===2,w=T*(big?.86:.76),h=T*(big?.22:.18);
+  c.strokeStyle='rgba(255,255,255,.4)';c.lineWidth=2;c.beginPath();c.ellipse(cx,cy+h*.7,w*.6,h*.4,0,0,7);c.stroke();
+  drawPerson(cx-w*.08,cy-h*.55,1,big?'#5b6f8a':'#8b5a2b');
+  if(big&&kind===s.era&&s.clay>0){c.fillStyle='#9a5d32';c.beginPath();c.ellipse(cx+w*.25,cy-h*.35,T*.09,T*.06,0,0,7);c.fill()}
+  const sw=Math.sin(now/260)*T*.05;c.strokeStyle='#4a3018';c.lineWidth=Math.max(2,T*.03);c.beginPath();c.moveTo(cx+w*.02,cy-h*1.3);c.lineTo(cx+w*.28+sw,cy+h*.8);c.stroke();
+  c.fillStyle='#4a3018';c.beginPath();c.ellipse(cx+w*.28+sw,cy+h*.8,T*.03,T*.07,-.4,0,7);c.fill();
+  c.fillStyle=big?'#5a4632':'#6b4423';c.beginPath();c.moveTo(cx-w/2,cy-h*.35);c.quadraticCurveTo(cx,cy+h*1.4,cx+w/2,cy-h*.35);
+  c.quadraticCurveTo(cx,cy+h*.15,cx-w/2,cy-h*.35);c.fill();
+  c.strokeStyle=big?'#8a7050':'#a0703f';c.lineWidth=Math.max(1.5,T*.025);c.beginPath();c.moveTo(cx-w/2,cy-h*.35);c.quadraticCurveTo(cx,cy+h*.15,cx+w/2,cy-h*.35);c.stroke();
+  if(big){c.strokeStyle='#463626';c.beginPath();c.moveTo(cx-w*.4,cy);c.quadraticCurveTo(cx,cy+h*.75,cx+w*.4,cy);c.stroke()}
+}
+function drawWalker(cx,cy,now){
+  const c=dctx,sw=anim?Math.sin(now/90)*T*.05:0;c.strokeStyle='#3a2614';c.lineWidth=Math.max(2,T*.035);
+  c.beginPath();c.moveTo(cx,cy+T*.05);c.lineTo(cx-T*.05+sw,cy+T*.22);c.moveTo(cx,cy+T*.05);c.lineTo(cx+T*.05-sw,cy+T*.22);c.stroke();
+  c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.ellipse(cx,cy+T*.24,T*.13,T*.04,0,0,7);c.fill();
+  drawPerson(cx,cy-T*.02,1.05,s.era===6?'#4a4a52':s.era===5?'#26231f':s.era===4?'#3d5a8a':s.era===3?'#9b2d20':s.era===2?'#5b6f8a':'#8b5a2b');
+  c.strokeStyle='#5a3a1c';c.lineWidth=Math.max(2,T*.025);c.beginPath();c.moveTo(cx+T*.13,cy-T*.3);c.lineTo(cx+T*.13,cy+T*.22);c.stroke();
+}
+function emoji(ch,x,y,size){const c=dctx;c.font=`${size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(ch,x,y)}
+function draw(now){
+  dctx=ctx;ctx.clearRect(0,0,W,H);if(!s)return;
+  if(anim&&now-anim.t0>=STEP_MS){anim=null;step();advance()}
+  ctx.fillStyle='#1d1912';ctx.fillRect(ox-4,oy-4,COLS*T+8,ROWS*T+8);
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)drawTerrain(x,y,now);
+  ctx.font=`600 ${Math.max(11,T*.22)}px Grandstander, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+  const lab=(txt,x,y)=>{if(s.fog[Math.floor(y)*COLS+Math.floor(x)]){ctx.fillStyle='rgba(42,36,27,.55)';ctx.fillText(txt,ox+x*T,oy+y*T)}};
+  if(s.era<3)lab('Drenthe',11.5,9.75);if(s.era===2){lab('Friesland',3,4.75);lab(t('wadden'),7,.5)}
+  if(s.era===3){ctx.fillStyle='rgba(255,255,255,.6)';if(s.fog[5*COLS+7])ctx.fillText(t('rhine'),ox+7.5*T,oy+5.82*T);lab(t('frisians'),3.5,1.2)}
+  if(s.era===7){ctx.fillStyle='rgba(255,255,255,.75)';ctx.fillText(t('haringvlietL'),ox+8*T,oy+2.5*T);ctx.fillText(t('oosterscheldeL'),ox+8*T,oy+5.5*T);ctx.fillText(t('westerscheldeL'),ox+8*T,oy+8.5*T);
+    ctx.fillStyle='rgba(42,36,27,.65)';ctx.fillText(t('factoryL'),ox+12.6*T,oy+.95*T)}
+  if(s.era===6){ctx.fillStyle='rgba(42,36,27,.65)';ctx.fillText(t('haarlemL'),ox+2.5*T,oy+1.75*T);ctx.fillText('Amsterdam',ox+10.5*T,oy+1.75*T);
+    PUMPS6.forEach((pp,i)=>ctx.fillText(PUMPNAMES[i],ox+(pp[0]+.5)*T,oy+(pp[1]+.92)*T));
+    ctx.fillStyle='rgba(255,255,255,.8)';ctx.fillText(t('havenL'),ox+11.5*T,oy+2.92*T);if(!s.dry6&&tile(6,5)==='M')ctx.fillText(t('lakeL'),ox+6*T,oy+5.5*T)}
+  if(s.era===5){ctx.fillStyle='rgba(255,255,255,.75)';ctx.fillText(t('norway'),ox+.6*T,oy+1.72*T);ctx.fillText(t('baltic'),ox+13.3*T,oy+1.22*T);ctx.fillText('IJ',ox+6.5*T,oy+1.5*T);
+    ctx.fillStyle='rgba(42,36,27,.6)';ctx.fillText(t('zaan'),ox+1.5*T,oy+3.85*T);ctx.fillText(t('pakhuisL'),ox+7.5*T,oy+3.9*T);ctx.fillText(t('damL'),ox+6.5*T,oy+9.88*T)}
+  if(s.era===4){ctx.fillStyle='rgba(255,255,255,.6)';ctx.fillText(t('amstel'),ox+5.5*T,oy+8.82*T);ctx.fillText(t('zuiderzee'),ox+11.5*T,oy+1*T);lab('Kampen',13.5,4.15)}
+  // roads first so forts sit on top
+  for(const k in s.obj){const o=s.obj[k],[x,y]=k.split(',').map(Number);if(o.kind==='road'&&s.fog[y*COLS+x])drawRoad(ox+x*T,oy+y*T,x,y)}
+  for(const k in s.obj){const o=s.obj[k],[x,y]=k.split(',').map(Number);if(!s.fog[y*COLS+x])continue;const cx=ox+(x+.5)*T,cy=oy+(y+.5)*T;
+    if(o.kind==='hut')drawHut(cx,cy);else if(o.kind==='field')drawField(ox+x*T,oy+y*T);else if(o.kind==='hunebed')drawHunebed(cx,cy,o.p);
+    else if(o.kind==='farm')drawFarm(cx,cy,o,now);else if(o.kind==='fort')drawFort(cx,cy,o.p);
+    else if(o.kind==='dyke')drawDyke(ox+x*T,oy+y*T,o.p);else if(o.kind==='dam')drawDam(ox+x*T,oy+y*T,o.p);
+    else if(o.kind==='mill')drawMill(cx,cy,o.p,now);else if(o.kind==='city')drawCity(cx,cy);else if(o.kind==='hanze')drawHanze(cx,cy);
+    else if(o.kind==='gracht')drawGrachtHouse(cx,cy,o.p,x,y);else if(o.kind==='stadhuis')drawStadhuis(cx,cy,o.p);else if(o.kind==='zaag')drawMill(cx,cy,o.p,now);
+    else if(o.kind==='pakhuis')drawPakhuis(cx,cy);else if(o.kind==='port')drawPort(cx,cy,o.res);
+    else if(o.kind==='roof')drawRoof(cx,cy,o,now);else if(o.kind==='factory')drawFactory(cx,cy);else if(o.kind==='dam7')drawDam7(ox+x*T,oy+y*T,o.p);else if(o.kind==='kering')drawKering(ox+x*T,oy+y*T,o.p,s.gates,now);
+    else if(o.kind==='rail')drawRail(ox+x*T,oy+y*T,o.p);else if(o.kind==='gemaal')drawGemaal(cx,cy,o.p,o.fuel,now);else if(o.kind==='haven')drawHaven(cx,cy);
+    else if(o.kind==='fries'){drawFarm(cx,cy,{terp:TERP_MAX,house:true},now);drawPerson(cx+T*.36,cy+T*.12,.9,'#7a8a4a');emoji('🐄',cx-T*.34,cy+T*.3,T*.26)}}
+  for(const k in s.res){const [x,y]=k.split(',').map(Number);if(!s.fog[y*COLS+x])continue;const cx=ox+(x+.5)*T,cy=oy+(y+.5)*T+Math.sin(now/400+x+y)*T*.03,r=s.res[k];
+    if(r==='clay'){ctx.fillStyle='#9a5d32';ctx.beginPath();ctx.ellipse(cx,cy+T*.08,T*.22,T*.12,0,0,7);ctx.fill();ctx.fillStyle='#b06c3a';ctx.beginPath();ctx.ellipse(cx-T*.03,cy,T*.15,T*.11,0,0,7);ctx.fill();ctx.fillStyle='#d39563';ctx.beginPath();ctx.ellipse(cx-T*.07,cy-T*.04,T*.05,T*.03,0,0,7);ctx.fill()}
+    else emoji({deer:'🦌',fish:'🐟',berry:'🫐',wood:'🪵',stone:'🪨'}[r],cx,cy,T*.48)}
+  const seen={};for(const c of s.cows){const k=key(c.x,c.y),i=seen[k]=(seen[k]||0)+1;if(!s.fog[c.y*COLS+c.x])continue;
+    const o=s.obj[k],onObj=o&&(o.kind==='farm'||o.kind==='fort');emoji('🐄',ox+(c.x+(onObj?.8:.3+.35*((i-1)%2)))*T+Math.sin(now/1500+i)*T*.03,oy+(c.y+(onObj?.82:.35+.3*(i>2)))*T,T*(onObj?.28:.34))}
+  if(s.era===2||s.era===4||s.era===7){
+    if(s.flood>0)for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(isFlooded(x,y)){const o=s.obj[key(x,y)];
+      ctx.fillStyle='rgba(63,111,135,.72)';ctx.fillRect(ox+x*T,oy+y*T,T+.5,T+.5);ctx.strokeStyle='rgba(255,255,255,.3)';ctx.lineWidth=2;const off=((now/900+x*.3)%1)*T*.4;
+      ctx.beginPath();ctx.moveTo(ox+x*T+off,oy+(y+.6)*T);ctx.quadraticCurveTo(ox+x*T+off+T*.12,oy+(y+.52)*T,ox+x*T+off+T*.24,oy+(y+.6)*T);ctx.stroke();
+      if(o&&o.kind==='farm'&&(o.terp>=TERP_MAX||s.era===4))drawFarm(ox+(x+.5)*T,oy+(y+.5)*T,o,now);
+      if(o&&o.kind==='roof')drawRoof(ox+(x+.5)*T,oy+(y+.5)*T,o,now);
+      if(o&&(o.kind==='city'||o.kind==='mill'))s.era===4&&(o.kind==='city'?drawCity(ox+(x+.5)*T,oy+(y+.5)*T):drawMill(ox+(x+.5)*T,oy+(y+.5)*T,o.p,now))}
+    const left=s.stormAt-s.steps,calm=s.era===2?s.won2:(s.won4||s.dry);let dark=calm?0:s.flood>0?.3:left<=4?(5-left)*.06:0;
+    if(s.era===7)dark=s.won?0:s.phase7==='flood'?.12:s.phase7==='held'?.32:s.phase7==='storm'?.04+.26*(1-s.stormLeft/STORM7):0;
+    if(dark){ctx.fillStyle=`rgba(20,28,40,${dark})`;ctx.fillRect(ox,oy,COLS*T,ROWS*T);ctx.strokeStyle='rgba(200,215,230,.45)';ctx.lineWidth=1.5;
+      for(let i=0;i<70;i++){const rx=ox+((hash(i,1)*COLS*T+now*.05)%(COLS*T)),ry=oy+((hash(i,2)*ROWS*T+now*.5)%(ROWS*T));ctx.beginPath();ctx.moveTo(rx,ry);ctx.lineTo(rx-3,ry+10);ctx.stroke()}}
+  }
+  // where things may go
+  if(mode&&(mode.type==='field'||mode.type==='hunebed')){const pulse=.25+.2*Math.sin(now/250);
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(mode.type==='field'?validField(x,y):validHune(x,y)){ctx.fillStyle=`rgba(232,180,74,${pulse})`;ctx.fillRect(ox+x*T+2,oy+y*T+2,T-4,T-4);ctx.strokeStyle='#e8b44a';ctx.lineWidth=3;ctx.strokeRect(ox+x*T+3,oy+y*T+3,T-6,T-6)}}
+  if(s.era===7&&!mode&&!s.won&&s.phase7!=='flood'){ctx.setLineDash([6,5]);ctx.lineWidth=2.5;
+    for(const p of [DAM7A,DAM7B])if(!objAt(p)){ctx.strokeStyle=s.beton>=3?'#e8b44a':'rgba(242,228,193,.6)';ctx.strokeRect(ox+p[0]*T+4,oy+p[1]*T+4,T-8,T-8)}
+    const kk=objAt(DAM7B);if(s.phase7==='storm'&&kk&&kk.kind==='kering'&&s.gates==='open'){ctx.setLineDash([]);ctx.strokeStyle='#e8b44a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(ox+(DAM7B[0]+.5)*T,oy+(DAM7B[1]+.5)*T,T*(.5+.06*Math.sin(now/150)),0,7);ctx.stroke()}
+    ctx.setLineDash([])}
+  if(s.era===6&&!mode&&!s.won6){ctx.setLineDash([6,5]);ctx.lineWidth=2.5;
+    for(const p of RAILS6)if(!objAt(p)){ctx.strokeStyle=validRail(p[0],p[1])?'#e8b44a':'rgba(242,228,193,.45)';ctx.strokeRect(ox+p[0]*T+4,oy+p[1]*T+4,T-8,T-8)}
+    for(const p of PUMPS6)if(!objAt(p)){ctx.strokeStyle=s.coal>=2?'#e8b44a':'rgba(242,228,193,.55)';ctx.strokeRect(ox+p[0]*T+4,oy+p[1]*T+4,T-8,T-8)}
+    ctx.setLineDash([])}
+  if(s.era===6&&s.rail){const ph=(now/9000)%2,f=ph<1?ph:2-ph;drawTrain(ox+(3+f*6+.5)*T,oy+2.45*T,now)}
+  if(s.era===5&&!mode&&!s.won5){ctx.setLineDash([6,5]);ctx.lineWidth=2.5;
+    const spot=(p,ok)=>{if(objAt(p))return;ctx.strokeStyle=ok?'#e8b44a':'rgba(242,228,193,.55)';ctx.strokeRect(ox+p[0]*T+4,oy+p[1]*T+4,T-8,T-8)};
+    if(!s.saw)spot(ZAAN,s.coin>=3);spot(DAM5,s.wood>=4&&s.coin>=4);
+    if(s.wood>=3)for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(validHouse(x,y)){ctx.strokeStyle='rgba(232,180,74,.45)';ctx.strokeRect(ox+x*T+7,oy+y*T+7,T-14,T-14)}
+    ctx.setLineDash([])}
+  if(s.era===4&&!mode&&!s.won4){ctx.setLineDash([6,5]);ctx.lineWidth=2.5;
+    for(const [p,cost] of [...DYKES.map(d=>[d,2]),[DAM,3]]){if(objAt(p))continue;ctx.strokeStyle=s.clay>=cost?'#e8b44a':'rgba(242,228,193,.6)';ctx.strokeRect(ox+p[0]*T+4,oy+p[1]*T+4,T-8,T-8)}
+    if(ringClosed()&&!Object.values(s.obj).some(o=>o.kind==='mill')&&s.wood>=3)for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(inPolder(x,y)&&!s.obj[key(x,y)]){ctx.strokeStyle='rgba(232,180,74,.7)';ctx.strokeRect(ox+x*T+6,oy+y*T+6,T-12,T-12)}
+    ctx.setLineDash([])}
+  if(s.era===3&&!mode&&!s.won3){ctx.setLineDash([6,5]);ctx.lineWidth=2.5;
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){if(!s.fog[y*COLS+x])continue;
+      if(s.wood>=3&&validFort(x,y)){ctx.strokeStyle='#e8b44a';ctx.strokeRect(ox+x*T+4,oy+y*T+4,T-8,T-8)}
+      else if(s.stone>=1&&validRoad(x,y)){ctx.strokeStyle='rgba(242,228,193,.7)';ctx.strokeRect(ox+x*T+6,oy+y*T+6,T-12,T-12)}}
+    ctx.setLineDash([])}
+  let ux=s.unit.x,uy=s.unit.y;if(anim){const p=Math.min(1,(now-anim.t0)/STEP_MS),e=p*p*(3-2*p);ux=anim.fx+(s.unit.x-anim.fx)*e;uy=anim.fy+(s.unit.y-anim.fy)*e}
+  if(target){ctx.strokeStyle='rgba(242,228,193,.8)';ctx.lineWidth=2;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(ox+(target.x+.5)*T,oy+(target.y+.5)*T,T*.3,0,7);ctx.stroke();ctx.setLineDash([])}
+  const ucx=ox+(ux+.5)*T,ucy=oy+(uy+.5)*T,wx=Math.round(ux),wy=Math.round(uy),uo=s.obj[key(wx,wy)];
+  // the canoe glows to invite a tap; brighter until it has been tapped once
+  if(s.era===1&&!anim&&onWater(wx,wy)){const seen=s.said.canoeSeen,pr=T*(.46+.05*Math.sin(now/300));
+    ctx.strokeStyle=seen?'rgba(232,180,74,.35)':'rgba(232,180,74,.9)';ctx.lineWidth=seen?2:4;ctx.beginPath();ctx.arc(ucx,ucy+T*.05,pr,0,7);ctx.stroke();
+    if(!seen)emoji('✨',ucx+T*.38,ucy-T*.36,T*.3)}
+  if(s.era===7)drawHeli(ucx,ucy,now);else if(onWater(wx,wy))drawBoat(ucx,ucy+T*.1,now);else if(!uo||uo.kind==='road'||anim)drawWalker(ucx,ucy,now);else drawWalker(ucx+T*.32,ucy+T*.1,now);
+  if(mode&&mode.type==='build'){const [x,y]=mode.k.split(',').map(Number),cx=ox+(x+.5)*T,cy=oy+(y+.5)*T,pr=.45+.06*Math.sin(now/180);
+    ctx.strokeStyle='#e8b44a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(cx,cy,T*pr,0,7);ctx.stroke();emoji('👆',cx+T*.35,cy-T*.55+Math.abs(Math.sin(now/200))*T*-.12,T*.5)}
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(!s.fog[y*COLS+x]){ctx.fillStyle='#2a241b';ctx.fillRect(ox+x*T,oy+y*T,T+.5,T+.5)}
+  ctx.fillStyle='#2a241b';
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){if(s.fog[y*COLS+x])continue;let edge=false;for(const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]])if(inB(x+a,y+b)&&s.fog[(y+b)*COLS+x+a])edge=true;
+    if(edge)for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(ox+(x+.15+.7*rnd(x,y,i+20))*T,oy+(y+.15+.7*rnd(x,y,i+24))*T,T*.38,0,7);ctx.fill()}}
+  parts=parts.filter(p=>now-p.t0<1200);for(const p of parts){const k=(now-p.t0)/1200;ctx.globalAlpha=1-k;
+    ctx.font=`800 ${T*.32}px Grandstander, sans-serif`;ctx.textAlign='center';ctx.fillStyle='#fff8e0';ctx.strokeStyle='#2a241b';ctx.lineWidth=4;
+    const px=ox+p.x*T,py=oy+(p.y-k*.8)*T;ctx.strokeText(p.txt,px-T*.12,py);ctx.fillText(p.txt,px-T*.12,py);
+    if(p.icon==='clay'){ctx.fillStyle='#b06c3a';ctx.beginPath();ctx.ellipse(px+T*.18,py,T*.1,T*.07,0,0,7);ctx.fill()}else if(p.icon&&p.icon[0]!=='<')emoji(p.icon,px+T*.18,py,T*.3);ctx.globalAlpha=1}
+  confetti=confetti.filter(c=>now-c.t0<1600);for(const c of confetti){const tt=(now-c.t0)/16;ctx.fillStyle=c.c;ctx.globalAlpha=1-(now-c.t0)/1600;
+    ctx.fillRect(ox+(c.x+c.vx*tt)*T,oy+(c.y+c.vy*tt+.0009*tt*tt)*T,7,7);ctx.globalAlpha=1}
+}
+// the windmill keeps pumping on its own, so the polder visibly dries while you watch
+setInterval(()=>{if(s&&s.era===4&&!s.dry&&!tr&&$('ov').hidden&&ringClosed()&&millDone()){drain();refresh();save()}},650);
+function loop(now){try{draw(now)}catch(e){console.error(e)}try{drawTrace(now)}catch(e){console.error(e)}requestAnimationFrame(loop)}
+
+/* ---------- boot ---------- */
+function start(data){
+  try{noteOpen=localStorage.getItem(KEY+'-note')!=='0'}catch(e){}
+  let l=data&&data.lang;try{l=l||localStorage.getItem('lagelanden-lang')}catch(e){}
+  let saved=null;try{if(data&&data.save)saved=JSON.parse(data.save);else{const raw=localStorage.getItem(KEY);if(raw)saved=JSON.parse(raw)}}catch(e){}
+  if(saved&&saved.v===2)s=migrate(saved);else{s=newState();reveal(8,9,2)}
+  setLang(l==='nl'?'nl':'en');
+  resize();refresh();requestAnimationFrame(loop);
+  window.claude?.hot?.snapshot?.(()=>({save:JSON.stringify(s),lang}));
+  if(data&&data.save){started=true;return}
+  hasSave=saved&&saved.steps>0;
+  showTitle();
+}
+let hasSave=false;
+function showTitle(){
+  overlay(()=>`<h1>De Lage Landen</h1><div class="yr">${t('tagline')}</div>${t('introHtml')}`,
+    ()=>(hasSave?[{label:t('keepPlaying'),fn:()=>{started=true;say('welcome')}},{label:t('newGame'),alt:1,fn:()=>{started=true;s=newState();reveal(8,9,2);cardSig='';save();intro1()}}]
+               :[{label:t('play'),fn:()=>{started=true;intro1()}}]).concat([{label:t('abcBtn'),alt:1,fn:showBoard}]),true);
+}
+window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
+</script>
+<script>if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}</script>
